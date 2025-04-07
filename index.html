@@ -1,73 +1,145 @@
 <html>
-	<!--
-		SPDX-FileCopyrightText: 2023 The Pion community <https://pion.ly>
-		SPDX-License-Identifier: MIT
-	-->
 	<head>
-		<title>whip-whep</title>
+		<title>Inu Desktop</title>
+		<style>
+			* {
+				margin: 0;
+			}
+
+			:root {
+				--controls: 64px;
+				--controls-padding: 24px;
+			}
+
+			body {
+				background: #000;
+				color: #fff;
+			}
+
+			#video {
+				position: fixed;
+				margin: auto;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: var(--controls);
+				width: 100vw;
+				height: calc(100vh - var(--controls));
+			}
+
+			#controls {
+				position: fixed;
+				margin: auto;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				height: var(--controls);
+				background-color: #111;
+				display: flex;
+				align-items: center;
+				justify-content: flex-start;
+				padding: 0 var(--controls-padding);
+			}
+
+			#init {
+				position: fixed;
+				margin: auto;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				top: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background-color: rgba(17, 17, 17, 0.8);
+				z-index: 9999;
+				text-align: center;
+			}
+		</style>
 	</head>
-
 	<body>
-		<!-- <button onclick="window.doWHEP()">Subscribe</button> -->
-		<h3>Video</h3>
-		<video
-			id="videoPlayer"
-			autoplay
-			muted
-			controls
-			style="width: 500"
-		></video>
-
-		<h3>ICE Connection States</h3>
-		<div id="iceConnectionStates"></div>
-		<br />
+		<div id="init">
+			<h1>click here<br />to play</h1>
+		</div>
+		<video id="video" autoplay></video>
+		<div id="controls">
+			<p>hi</p>
+		</div>
 	</body>
 
 	<script>
-		let peerConnection = new RTCPeerConnection();
+		const video = document.getElementById("video");
 
-		peerConnection.oniceconnectionstatechange = () => {
-			let el = document.createElement("p");
-			el.appendChild(
-				document.createTextNode(peerConnection.iceConnectionState),
-			);
+		// let peer = new RTCPeerConnection();
+		// peer = null;
+		let peer;
 
-			document.getElementById("iceConnectionStates").appendChild(el);
+		const onIceChange = () => {
+			console.log(peer.iceConnectionState);
+			if (
+				peer.iceConnectionState == "disconnected" ||
+				peer.iceConnectionState == "failed" ||
+				peer.iceConnectionState == "closed"
+			) {
+				init();
+			}
 		};
 
-		window.doWHEP = () => {
-			peerConnection.addTransceiver("video", { direction: "recvonly" });
-			peerConnection.addTransceiver("audio", { direction: "recvonly" });
+		const onTrack = event => {
+			video.srcObject = event.streams[0];
+			video.play();
+		};
 
-			peerConnection.ontrack = function (event) {
-				document.getElementById("videoPlayer").srcObject =
-					event.streams[0];
-			};
+		async function init() {
+			console.log("initializing...");
 
-			peerConnection.createOffer().then(offer => {
-				console.log(offer);
+			if (peer != null) {
+				console.log("closing...");
+				peer.removeEventListener(
+					"iceconnectionstatechange",
+					onIceChange,
+				);
+				peer.removeEventListener("track", onTrack);
+				peer.close();
+			}
 
-				peerConnection.setLocalDescription(offer);
+			peer = new RTCPeerConnection();
 
-				fetch(`/whep`, {
-					method: "POST",
-					body: offer.sdp,
-					headers: {
-						Authorization: `Bearer none`,
-						"Content-Type": "application/sdp",
-					},
-				})
-					.then(r => r.text())
-					.then(answer => {
-						console.log(answer);
-						peerConnection.setRemoteDescription({
-							sdp: answer,
-							type: "answer",
-						});
-					});
+			peer.addEventListener("iceconnectionstatechange", onIceChange);
+			peer.addEventListener("track", onTrack);
+
+			peer.addTransceiver("video", { direction: "recvonly" });
+			peer.addTransceiver("audio", { direction: "recvonly" });
+
+			const offer = await peer.createOffer();
+
+			peer.setLocalDescription(offer);
+
+			// console.log(offer.sdp);
+
+			const res = await fetch(`/whep`, {
+				method: "POST",
+				body: offer.sdp,
+				headers: {
+					"Content-Type": "application/sdp",
+				},
 			});
-		};
 
-		window.doWHEP();
+			const answer = await res.text();
+
+			peer.setRemoteDescription({
+				sdp: answer,
+				type: "answer",
+			});
+		}
+
+		init();
+
+		const initEl = document.getElementById("init");
+
+		initEl.addEventListener("click", () => {
+			initEl.remove();
+			video.play();
+		});
 	</script>
 </html>

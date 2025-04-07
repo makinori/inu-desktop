@@ -3,10 +3,11 @@ package main
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
-	"regexp"
 	"strconv"
 
+	"github.com/charmbracelet/log"
 	"github.com/pion/ice/v4"
 	"github.com/pion/webrtc/v4"
 )
@@ -15,9 +16,10 @@ const WEB_PORT = 4845
 const UDP_PORT = 4845
 
 var (
-	localPort int
+	// localPort int
+	localRtpPort int
 
-	localWebRTCAPI  *webrtc.API
+	// localWebRTCAPI  *webrtc.API
 	publicWebRTCAPI *webrtc.API
 
 	streamVideoTrack *webrtc.TrackLocalStaticRTP
@@ -32,11 +34,11 @@ var (
 		// },
 	}
 
-	localServeMux  *http.ServeMux
+	// localServeMux  *http.ServeMux
 	publicServeMux *http.ServeMux
 
-	sdpH264RegExp = regexp.MustCompile("(?i)rtpmap:([0-9]+) h264")
-	sdpOpusRegExp = regexp.MustCompile("(?i)rtpmap:([0-9]+) opus")
+	// sdpH264RegExp = regexp.MustCompile("(?i)rtpmap:([0-9]+) h264")
+	// sdpOpusRegExp = regexp.MustCompile("(?i)rtpmap:([0-9]+) opus")
 )
 
 func mustSetupWebRTC() {
@@ -95,7 +97,7 @@ func mustSetupWebRTC() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("public udp listening at %d\n", UDP_PORT)
+	log.Infof("public udp listening at %d", UDP_PORT)
 
 	publicSettingEngine := webrtc.SettingEngine{}
 	publicSettingEngine.SetLite(true)
@@ -116,45 +118,46 @@ func mustSetupWebRTC() {
 
 	// setup local setting engine
 
-	localPort, err = getFreePort()
-	if err != nil {
-		panic(err)
-	}
+	// localPort, err = getFreePort()
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	localUDPMux, err := ice.NewMultiUDPMuxFromPort(
-		localPort, ice.UDPMuxFromPortWithLoopback(),
-	)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("local udp listening at %d\n", localPort)
+	// localUDPMux, err := ice.NewMultiUDPMuxFromPort(
+	// 	localPort, ice.UDPMuxFromPortWithLoopback(),
+	// )
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// fmt.Printf("local udp listening at %d\n", localPort)
 
-	localSettingEngine := webrtc.SettingEngine{}
-	localSettingEngine.SetLite(true)
-	localSettingEngine.SetICEUDPMux(localUDPMux)
-	localSettingEngine.SetIncludeLoopbackCandidate(true)
-	localSettingEngine.SetInterfaceFilter(func(s string) (keep bool) {
-		return false
-	})
-	localSettingEngine.SetNetworkTypes([]webrtc.NetworkType{
-		webrtc.NetworkTypeUDP4,
-	})
-	// TODO: gstreamer cant connect to loopback candidate
-	// commenting below will let all interfaces candidate
-	localSettingEngine.SetNAT1To1IPs([]string{"127.0.0.1"},
-		webrtc.ICECandidateTypeHost,
-	)
+	// localSettingEngine := webrtc.SettingEngine{}
+	// localSettingEngine.SetLite(true)
+	// localSettingEngine.SetICEUDPMux(localUDPMux)
+	// localSettingEngine.SetIncludeLoopbackCandidate(true)
+	// localSettingEngine.SetInterfaceFilter(func(s string) (keep bool) {
+	// 	return false
+	// })
+	// localSettingEngine.SetNetworkTypes([]webrtc.NetworkType{
+	// 	webrtc.NetworkTypeUDP4,
+	// })
+	// // TODO: gstreamer cant connect to loopback candidate
+	// // commenting below will let all interfaces candidate
+	// localSettingEngine.SetNAT1To1IPs([]string{"127.0.0.1"},
+	// 	webrtc.ICECandidateTypeHost,
+	// )
 
 	// make webrtc apis
 
-	localWebRTCAPI = webrtc.NewAPI(
-		webrtc.WithMediaEngine(mediaEngine),
-		webrtc.WithSettingEngine(localSettingEngine),
-	)
+	// localWebRTCAPI = webrtc.NewAPI(
+	// 	webrtc.WithMediaEngine(mediaEngine),
+	// 	webrtc.WithSettingEngine(localSettingEngine),
+	// )
 
 	publicWebRTCAPI = webrtc.NewAPI(
 		webrtc.WithMediaEngine(mediaEngine),
 		webrtc.WithSettingEngine(publicSettingEngine),
+		// webrtc.WithInterceptorRegistry(interceptorRegistry),
 	)
 
 	// setup tracks
@@ -176,9 +179,12 @@ func mustSetupWebRTC() {
 	}
 }
 
-func writeAnswer(w http.ResponseWriter, peer *webrtc.PeerConnection, offer []byte, path string) {
+func writeAnswer(
+	w http.ResponseWriter, r *http.Request, peer *webrtc.PeerConnection,
+	offer []byte, path string,
+) {
 	peer.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
-		fmt.Println(path + " ice: " + state.String())
+		log.Info(getRequestIP(r) + " " + state.String())
 
 		if state == webrtc.ICEConnectionStateFailed {
 			peer.Close()
@@ -221,68 +227,68 @@ func writeAnswer(w http.ResponseWriter, peer *webrtc.PeerConnection, offer []byt
 	fmt.Fprint(w, peer.LocalDescription().SDP)
 }
 
-func localWhipHandler(w http.ResponseWriter, r *http.Request) {
-	offer, err := io.ReadAll(r.Body)
-	if err != nil {
-		panic(err)
-	}
+// func localWhipHandler(w http.ResponseWriter, r *http.Request) {
+// 	offer, err := io.ReadAll(r.Body)
+// 	if err != nil {
+// 		panic(err)
+// 	}
 
-	fmt.Println("got whip")
+// 	fmt.Println("got whip")
 
-	offerStr := string(offer)
+// 	offerStr := string(offer)
 
-	var videoPayloadType uint8
-	var audioPayloadType uint8
+// 	var videoPayloadType uint8
+// 	var audioPayloadType uint8
 
-	h264Matches := sdpH264RegExp.FindStringSubmatch(offerStr)
-	if len(h264Matches) > 0 {
-		value, _ := strconv.Atoi(h264Matches[1])
-		videoPayloadType = uint8(value)
-	}
+// 	h264Matches := sdpH264RegExp.FindStringSubmatch(offerStr)
+// 	if len(h264Matches) > 0 {
+// 		value, _ := strconv.Atoi(h264Matches[1])
+// 		videoPayloadType = uint8(value)
+// 	}
 
-	opusMatches := sdpOpusRegExp.FindStringSubmatch(offerStr)
-	if len(opusMatches) > 0 {
-		value, _ := strconv.Atoi(opusMatches[1])
-		audioPayloadType = uint8(value)
-	}
+// 	opusMatches := sdpOpusRegExp.FindStringSubmatch(offerStr)
+// 	if len(opusMatches) > 0 {
+// 		value, _ := strconv.Atoi(opusMatches[1])
+// 		audioPayloadType = uint8(value)
+// 	}
 
-	// offerStr = strings.ReplaceAll(offerStr, "192.168.1.36", "127.0.0.1")
-	// fmt.Println(offerStr)
-	// offer = []byte(offerStr)
+// 	// offerStr = strings.ReplaceAll(offerStr, "192.168.1.36", "127.0.0.1")
+// 	// fmt.Println(offerStr)
+// 	// offer = []byte(offerStr)
 
-	peer, err := localWebRTCAPI.NewPeerConnection(peerConfig)
-	if err != nil {
-		panic(err)
-	}
+// 	peer, err := localWebRTCAPI.NewPeerConnection(peerConfig)
+// 	if err != nil {
+// 		panic(err)
+// 	}
 
-	_, err = peer.AddTransceiverFromKind(webrtc.RTPCodecTypeVideo)
-	if err != nil {
-		panic(err)
-	}
+// 	_, err = peer.AddTransceiverFromKind(webrtc.RTPCodecTypeVideo)
+// 	if err != nil {
+// 		panic(err)
+// 	}
 
-	_, err = peer.AddTransceiverFromKind(webrtc.RTPCodecTypeAudio)
-	if err != nil {
-		panic(err)
-	}
+// 	_, err = peer.AddTransceiverFromKind(webrtc.RTPCodecTypeAudio)
+// 	if err != nil {
+// 		panic(err)
+// 	}
 
-	peer.OnTrack(func(track *webrtc.TrackRemote, r *webrtc.RTPReceiver) {
-		for {
-			pkt, _, err := track.ReadRTP()
-			if err != nil {
-				return
-			}
+// 	peer.OnTrack(func(track *webrtc.TrackRemote, r *webrtc.RTPReceiver) {
+// 		for {
+// 			pkt, _, err := track.ReadRTP()
+// 			if err != nil {
+// 				return
+// 			}
 
-			switch pkt.PayloadType {
-			case videoPayloadType:
-				streamVideoTrack.WriteRTP(pkt)
-			case audioPayloadType:
-				streamAudioTrack.WriteRTP(pkt)
-			}
-		}
-	})
+// 			switch pkt.PayloadType {
+// 			case videoPayloadType:
+// 				streamVideoTrack.WriteRTP(pkt)
+// 			case audioPayloadType:
+// 				streamAudioTrack.WriteRTP(pkt)
+// 			}
+// 		}
+// 	})
 
-	writeAnswer(w, peer, offer, "/whip")
-}
+// 	writeAnswer(w, peer, offer, "/whip")
+// }
 
 func publicWhepHandler(w http.ResponseWriter, r *http.Request) {
 	offer, err := io.ReadAll(r.Body)
@@ -321,19 +327,17 @@ func publicWhepHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	writeAnswer(w, peer, offer, "/whep")
+	writeAnswer(w, r, peer, offer, "/whep")
 }
 
-func initWebRTC() chan bool {
-	keepAlive := make(chan bool)
-
+func initWebRTC() {
 	mustSetupWebRTC()
 
-	publicServeMux := http.NewServeMux()
+	publicServeMux = http.NewServeMux()
 	publicServeMux.HandleFunc("POST /whep", publicWhepHandler)
 	publicServeMux.Handle("/", http.FileServer(http.Dir(".")))
 
-	fmt.Println("public http listening at http://127.0.0.1:" + strconv.Itoa(WEB_PORT))
+	log.Infof("public http listening at http://127.0.0.1:%d", WEB_PORT)
 	go func() {
 		err := http.ListenAndServe(":"+strconv.Itoa(WEB_PORT), publicServeMux)
 		if err != nil {
@@ -341,59 +345,56 @@ func initWebRTC() chan bool {
 		}
 	}()
 
-	localServeMux = http.NewServeMux()
-	localServeMux.HandleFunc("POST /whip", localWhipHandler)
+	// localServeMux = http.NewServeMux()
+	// localServeMux.HandleFunc("POST /whip", localWhipHandler)
 
-	fmt.Println("local http listening at http://127.0.0.1:" + strconv.Itoa(localPort))
-	go func() {
-		err := http.ListenAndServe(":"+strconv.Itoa(localPort), localServeMux)
-		if err != nil {
-			panic(err)
-		}
-	}()
-
+	// fmt.Println("local http listening at http://127.0.0.1:" + strconv.Itoa(localPort))
 	// go func() {
-	// 	l, err := net.ListenUDP("udp", &net.UDPAddr{
-	// 		IP: net.ParseIP("127.0.0.1"), Port: 5004,
-	// 	})
+	// 	err := http.ListenAndServe(":"+strconv.Itoa(localPort), localServeMux)
 	// 	if err != nil {
 	// 		panic(err)
-	// 	}
-
-	// 	bufferSize := 300000 // 300KB
-	// 	err = l.SetReadBuffer(bufferSize)
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-
-	// 	defer func() {
-	// 		err = l.Close()
-	// 		if err != nil {
-	// 			panic(err)
-	// 		}
-	// 	}()
-
-	// 	inboundRTPPacket := make([]byte, 1600)
-	// 	for {
-	// 		n, _, err := l.ReadFrom(inboundRTPPacket)
-	// 		if err != nil {
-	// 			panic(fmt.Sprintf("error during read: %s", err))
-	// 		}
-
-	// 		// fmt.Println(n)
-
-	// 		_, err = streamVideoTrack.Write(inboundRTPPacket[:n])
-	// 		if err != nil {
-	// 			fmt.Println(err)
-	// 			if errors.Is(err, io.ErrClosedPipe) {
-	// 				// The peerConnection has been closed.
-	// 				return
-	// 			}
-
-	// 			panic(err)
-	// 		}
 	// 	}
 	// }()
 
-	return keepAlive
+	var err error
+	localRtpPort, err = getFreeUDPPort()
+	if err != nil {
+		panic(err)
+	}
+
+	log.Infof("local rtp listening at %d", localRtpPort)
+
+	go func() {
+		l, err := net.ListenUDP("udp", &net.UDPAddr{
+			IP: net.ParseIP("127.0.0.1"), Port: localRtpPort,
+		})
+		if err != nil {
+			panic(err)
+		}
+
+		bufferSize := 300000 // 300KB
+		err = l.SetReadBuffer(bufferSize)
+		if err != nil {
+			panic(err)
+		}
+
+		defer func() {
+			err = l.Close()
+			if err != nil {
+				panic(err)
+			}
+		}()
+
+		packet := make([]byte, 1600)
+		for {
+			n, _, err := l.ReadFrom(packet)
+			if err != nil {
+				log.Error("error during read: %s\n", err)
+				continue
+			}
+
+			streamVideoTrack.Write(packet[:n])
+
+		}
+	}()
 }
