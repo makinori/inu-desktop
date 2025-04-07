@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"github.com/pion/ice/v4"
@@ -33,6 +34,9 @@ var (
 
 	localServeMux  *http.ServeMux
 	publicServeMux *http.ServeMux
+
+	sdpH264RegExp = regexp.MustCompile("(?i)rtpmap:([0-9]+) h264")
+	sdpOpusRegExp = regexp.MustCompile("(?i)rtpmap:([0-9]+) opus")
 )
 
 func mustSetupWebRTC() {
@@ -136,7 +140,7 @@ func mustSetupWebRTC() {
 		webrtc.NetworkTypeUDP4,
 	})
 	// TODO: gstreamer cant connect to loopback candidate
-	// commenting below will let all interfaces cadidate
+	// commenting below will let all interfaces candidate
 	localSettingEngine.SetNAT1To1IPs([]string{"127.0.0.1"},
 		webrtc.ICECandidateTypeHost,
 	)
@@ -225,7 +229,23 @@ func localWhipHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("got whip")
 
-	// offerStr := string(offer)
+	offerStr := string(offer)
+
+	var videoPayloadType uint8
+	var audioPayloadType uint8
+
+	h264Matches := sdpH264RegExp.FindStringSubmatch(offerStr)
+	if len(h264Matches) > 0 {
+		value, _ := strconv.Atoi(h264Matches[1])
+		videoPayloadType = uint8(value)
+	}
+
+	opusMatches := sdpOpusRegExp.FindStringSubmatch(offerStr)
+	if len(opusMatches) > 0 {
+		value, _ := strconv.Atoi(opusMatches[1])
+		audioPayloadType = uint8(value)
+	}
+
 	// offerStr = strings.ReplaceAll(offerStr, "192.168.1.36", "127.0.0.1")
 	// fmt.Println(offerStr)
 	// offer = []byte(offerStr)
@@ -247,16 +267,15 @@ func localWhipHandler(w http.ResponseWriter, r *http.Request) {
 
 	peer.OnTrack(func(track *webrtc.TrackRemote, r *webrtc.RTPReceiver) {
 		for {
-
 			pkt, _, err := track.ReadRTP()
 			if err != nil {
 				return
 			}
 
 			switch pkt.PayloadType {
-			case 96:
+			case videoPayloadType:
 				streamVideoTrack.WriteRTP(pkt)
-			case 111:
+			case audioPayloadType:
 				streamAudioTrack.WriteRTP(pkt)
 			}
 		}
