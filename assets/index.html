@@ -111,7 +111,7 @@
 			</div>
 		</div>
 	</body>
-
+	<script src="./js/guacamole-keyboard.js"></script>
 	<script>
 		const initEl = document.getElementById("init");
 		const video = document.getElementById("video");
@@ -217,6 +217,30 @@
 		video.addEventListener("mouseup", e => {
 			sendMouseDownUp(e, false);
 		});
+
+		const keyboard = new Guacamole.Keyboard(document);
+
+		function sendKeyPress(keysym, down) {
+			if (!controlsCheckbox.checked) {
+				return;
+			}
+
+			const data = new Uint8Array([
+				2, // key press
+				...convertTypedArray(new Uint32Array([keysym]), Uint8Array),
+				down ? 1 : 0,
+			]);
+
+			ws.send(data);
+		}
+
+		keyboard.onkeydown = keysym => {
+			sendKeyPress(keysym, true);
+		};
+
+		keyboard.onkeyup = keysym => {
+			sendKeyPress(keysym, false);
+		};
 
 		// let peer = new RTCPeerConnection();
 		// peer = null;

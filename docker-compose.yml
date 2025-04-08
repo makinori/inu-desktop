@@ -1,6 +1,7 @@
 services:
     inu-desktop:
         build: .
+        container_name: inu
         ports:
             - 4845:4845/tcp
             - 4845:4845/udp
