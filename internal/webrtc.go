@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 
 var (
 	// localPort int
-	localRtpPort int
+	LocalRtpPort int
 
 	// localWebRTCAPI  *webrtc.API
 	publicWebRTCAPI *webrtc.API
@@ -31,7 +31,6 @@ var (
 	}
 
 	// localServeMux  *http.ServeMux
-	httpMux *http.ServeMux
 
 	// sdpH264RegExp = regexp.MustCompile("(?i)rtpmap:([0-9]+) h264")
 	// sdpOpusRegExp = regexp.MustCompile("(?i)rtpmap:([0-9]+) opus")
@@ -328,7 +327,7 @@ func publicWhepHandler(w http.ResponseWriter, r *http.Request) {
 	writeAnswer(w, r, peer, offer, "/whep")
 }
 
-func initWebRTC(httpMux *http.ServeMux) {
+func SetupWebRTC(httpMux *http.ServeMux) {
 	mustSetupWebRTC()
 
 	httpMux.HandleFunc("POST /whep", publicWhepHandler)
@@ -346,16 +345,16 @@ func initWebRTC(httpMux *http.ServeMux) {
 	// }()
 
 	var err error
-	localRtpPort, err = getFreeUDPPort()
+	LocalRtpPort, err = getFreeUDPPort()
 	if err != nil {
 		panic(err)
 	}
 
-	log.Infof("local rtp listening at %d", localRtpPort)
+	log.Infof("local rtp listening at %d", LocalRtpPort)
 
 	go func() {
 		l, err := net.ListenUDP("udp", &net.UDPAddr{
-			IP: net.ParseIP("127.0.0.1"), Port: localRtpPort,
+			IP: net.ParseIP("127.0.0.1"), Port: LocalRtpPort,
 		})
 		if err != nil {
 			panic(err)

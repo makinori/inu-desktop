@@ -10,6 +10,10 @@ services:
             WEB_PORT: 4845
             UDP_PORT: 4845
             PUBLIC_IP: 162.233.34.155
+
+            SCREEN_WIDTH: 1920
+            SCREEN_HEIGHT: 1080
+            FRAMERATE: 60
         deploy:
             resources:
                 reservations:

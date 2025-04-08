@@ -1,6 +1,7 @@
-package main
+package internal
 
 import (
+	"os"
 	"os/exec"
 	"time"
 
@@ -8,9 +9,8 @@ import (
 )
 
 type Process struct {
-	ID      string
-	Setup   func() *exec.Cmd
-	Command *exec.Cmd
+	ID    string
+	Start func()
 }
 
 type Supervisor struct {
@@ -25,10 +25,24 @@ func NewSupervisor() *Supervisor {
 	}
 }
 
-func (mgr *Supervisor) Add(id string, setup func() *exec.Cmd) {
+func (mgr *Supervisor) Add(id string, start func()) {
 	mgr.Processes = append(mgr.Processes, Process{
 		ID:    id,
-		Setup: setup,
+		Start: start,
+	})
+}
+
+func (mgr *Supervisor) AddSimple(id string, command string, arg ...string) {
+	mgr.Add(id, func() {
+		cmd := exec.Command(command, arg...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stdout
+
+		err := cmd.Run()
+
+		if err != nil {
+			log.Error(command+" error: ", err)
+		}
 	})
 }
 
@@ -43,17 +57,9 @@ func (mgr *Supervisor) Run() {
 		var run func()
 
 		run = func() {
-			process.Command = process.Setup()
-
 			log.Infof("starting %s...", process.ID)
-
-			err := process.Command.Run()
-			if err != nil {
-				log.Errorf("process %s: %s", process.ID, err)
-			}
-
+			process.Start()
 			time.Sleep(mgr.RestartTime)
-
 			run()
 		}
 
