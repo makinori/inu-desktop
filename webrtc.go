@@ -5,15 +5,11 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"strconv"
 
 	"github.com/charmbracelet/log"
 	"github.com/pion/ice/v4"
 	"github.com/pion/webrtc/v4"
 )
-
-const WEB_PORT = 4845
-const UDP_PORT = 4845
 
 var (
 	// localPort int
@@ -35,7 +31,7 @@ var (
 	}
 
 	// localServeMux  *http.ServeMux
-	publicServeMux *http.ServeMux
+	httpMux *http.ServeMux
 
 	// sdpH264RegExp = regexp.MustCompile("(?i)rtpmap:([0-9]+) h264")
 	// sdpOpusRegExp = regexp.MustCompile("(?i)rtpmap:([0-9]+) opus")
@@ -111,10 +107,12 @@ func mustSetupWebRTC() {
 	})
 	publicSettingEngine.SetNAT1To1IPs(
 		[]string{
-			"162.233.34.155", // TODO: use dns??
+			PUBLIC_IP, // TODO: use dns??
 		},
 		webrtc.ICECandidateTypeHost,
 	)
+
+	log.Infof("nat 1 to 1 set to %s", PUBLIC_IP)
 
 	// setup local setting engine
 
@@ -330,20 +328,11 @@ func publicWhepHandler(w http.ResponseWriter, r *http.Request) {
 	writeAnswer(w, r, peer, offer, "/whep")
 }
 
-func initWebRTC() {
+func initWebRTC(httpMux *http.ServeMux) {
 	mustSetupWebRTC()
 
-	publicServeMux = http.NewServeMux()
-	publicServeMux.HandleFunc("POST /whep", publicWhepHandler)
-	publicServeMux.Handle("/", http.FileServer(http.Dir(".")))
-
-	log.Infof("public http listening at http://127.0.0.1:%d", WEB_PORT)
-	go func() {
-		err := http.ListenAndServe(":"+strconv.Itoa(WEB_PORT), publicServeMux)
-		if err != nil {
-			panic(err)
-		}
-	}()
+	httpMux.HandleFunc("POST /whep", publicWhepHandler)
+	// publicServeMux.Handle("/", http.FileServer(http.Dir(".")))
 
 	// localServeMux = http.NewServeMux()
 	// localServeMux.HandleFunc("POST /whip", localWhipHandler)

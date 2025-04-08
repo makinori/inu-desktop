@@ -1,0 +1,19 @@
+services:
+    inu-desktop:
+        build: .
+        ports:
+            - 4845:4845/tcp
+            - 4845:4845/udp
+        sysctls:
+            - net.ipv6.conf.all.disable_ipv6=1
+        environment:
+            WEB_PORT: 4845
+            UDP_PORT: 4845
+            PUBLIC_IP: 162.233.34.155
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: 1
+                          capabilities: [gpu]
