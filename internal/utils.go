@@ -21,6 +21,7 @@ func getFreeTCPPort() (int, error) {
 
 	return l.Addr().(*net.TCPAddr).Port, nil
 }
+
 func getFreeUDPPort() (int, error) {
 	addr, err := net.ResolveUDPAddr("udp", "localhost:0")
 	if err != nil {

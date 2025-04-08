@@ -2,6 +2,20 @@
 	<head>
 		<title>Inu Desktop</title>
 		<style>
+			@font-face {
+				font-family: "SN Pro";
+				font-style: normal;
+				font-display: swap;
+				src: url(/fonts/SNPro-VariableRegular.woff2) format("woff2");
+			}
+
+			@font-face {
+				font-family: "SN Pro";
+				font-style: italic;
+				font-display: swap;
+				src: url(/fonts/SNPro-VariableItalic.woff2) format("woff2");
+			}
+
 			* {
 				margin: 0;
 				user-select: none;
@@ -17,6 +31,7 @@
 			body {
 				background: #000;
 				color: #fff;
+				font-family: "SN Pro", sans-serif;
 			}
 
 			#video {
@@ -103,6 +118,12 @@
 		const volumeSlider = document.getElementById("volume-slider");
 		const controlsCheckbox = document.getElementById("controls-checkbox");
 
+		const url = new URL(document.URL);
+		const https = url.protocol.includes("https");
+		const ws = new WebSocket(
+			(https ? "wss://" : "ws://") + url.host + "/api/ws",
+		);
+
 		video.volume = 0.8;
 
 		volumeSlider.value = video.volume;
@@ -113,34 +134,88 @@
 
 		controlsCheckbox.checked = true;
 
-		video.addEventListener("mousemove", e => {
-			if (!controlsCheckbox.checked) {
-				return;
+		function convertTypedArray(src, type) {
+			const buffer = new ArrayBuffer(src.byteLength);
+			const baseView = new src.constructor(buffer).set(src);
+			return new type(buffer);
+		}
+
+		function getNormalizedCoords(offsetX, offsetY) {
+			if (video.videoWidth == 0 || video.videoHeight == 0) {
+				return null;
 			}
 
 			const rect = video.getBoundingClientRect();
-			let x = e.offsetX / rect.width;
-			let y = e.offsetY / rect.height;
+			let x = offsetX / rect.width;
+			let y = offsetY / rect.height;
 
 			const streamRatio = video.videoWidth / video.videoHeight;
 			const elRatio = rect.width / rect.height;
 
 			if (streamRatio > elRatio) {
+				// scale vertically
 				y -= (1 - elRatio / streamRatio) * 0.5;
 				y *= streamRatio / elRatio;
 			} else {
+				// scale horizontally
 				x -= (1 - streamRatio / elRatio) * 0.5;
 				x *= elRatio / streamRatio;
 			}
 
 			if (x < 0 || y < 0 || x > 1 || y > 1) {
+				return null;
+			}
+
+			return [x, y];
+		}
+
+		video.addEventListener("mousemove", e => {
+			if (!controlsCheckbox.checked) {
 				return;
 			}
 
-			// x *= video.videoWidth;
-			// y *= video.videoHeight;
+			e.preventDefault();
 
-			// console.log(x, y);
+			const coords = getNormalizedCoords(e.offsetX, e.offsetY);
+			if (coords == null) {
+				return;
+			}
+
+			const data = new Uint8Array([
+				0, // mouse move
+				...convertTypedArray(new Float32Array(coords), Uint8Array),
+			]);
+
+			ws.send(data);
+		});
+
+		video.addEventListener("contextmenu", e => {
+			e.preventDefault();
+		});
+
+		function sendMouseDownUp(e, down) {
+			e.preventDefault();
+
+			const coords = getNormalizedCoords(e.offsetX, e.offsetY);
+			if (coords == null) {
+				return;
+			}
+
+			const data = new Uint8Array([
+				1, // mouse click
+				e.button,
+				down ? 1 : 0,
+			]);
+
+			ws.send(data);
+		}
+
+		video.addEventListener("mousedown", e => {
+			sendMouseDownUp(e, true);
+		});
+
+		video.addEventListener("mouseup", e => {
+			sendMouseDownUp(e, false);
 		});
 
 		// let peer = new RTCPeerConnection();

@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"strconv"
 
@@ -11,20 +12,13 @@ import (
 )
 
 var (
-	//go:embed assets/page.html
+	//go:embed assets
 	staticContent embed.FS
 
 	mgr *inu.Supervisor = inu.NewSupervisor()
 )
 
 func setupFFmpeg() {
-	// p1 fastest (lowest)
-	// p2 faster (lower)
-	// p3 fast (low)
-	// p4 medium (default)
-	// p5 slow (good)
-	// p6 slower (better)
-	// p7 slowest (best)
 
 	ffmpegArgs := []string{"-hide_banner", "-nostats", "-re"}
 
@@ -55,11 +49,19 @@ func setupFFmpeg() {
 		}
 	}
 
+	// p1 fastest (lowest)
+	// p2 faster (lower)
+	// p3 fast (low)
+	// p4 medium (default)
+	// p5 slow (good)
+	// p6 slower (better)
+	// p7 slowest (best)
+
 	// ffmpeg -hide_banner -h encoder=h264_nvenc
 
 	ffmpegArgs = append(ffmpegArgs,
 		"-filter:v", fmt.Sprintf("scale=%d:%d", inu.SCREEN_WIDTH, inu.SCREEN_HEIGHT),
-		"-pix_fmt", "yuv420p", "-profile:v", "baseline", // doesnt work
+		"-pix_fmt", "yuv420p", "-profile:v", "baseline",
 		"-c:v", "h264_nvenc", "-b:v", "8000K",
 		"-rc", "cbr", "-preset", "p5", "-tune", "ull",
 		"-multipass", "qres", "-zerolatency", "1",
@@ -97,6 +99,13 @@ func setupDesktop() {
 		"su", "inu", "-c",
 		"dbus-launch xfce4-session --display :0",
 	)
+
+	// need systemd-login
+	// mgr.AddSimple(
+	// 	"gnome",
+	// 	"su", "inu", "-c",
+	// 	"dbus-launch gnome-shell --x11 -d :0",
+	// )
 }
 
 func main() {
@@ -108,9 +117,17 @@ func main() {
 
 	inu.SetupWebRTC(httpMux)
 
-	httpMux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFileFS(w, r, staticContent, "assets/page.html")
-	})
+	if inu.IN_CONTAINER {
+		inu.SetupWebSocket(httpMux)
+
+		assets, err := fs.Sub(staticContent, "assets")
+		if err != nil {
+			panic(err)
+		}
+		httpMux.Handle("/", http.FileServerFS(assets))
+	} else {
+		httpMux.Handle("/", http.FileServer(http.Dir("assets/")))
+	}
 
 	mgr.Add("http", func() {
 		log.Infof("public http listening at http://0.0.0.0:%d", inu.WEB_PORT)

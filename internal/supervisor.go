@@ -41,7 +41,7 @@ func (mgr *Supervisor) AddSimple(id string, command string, arg ...string) {
 		err := cmd.Run()
 
 		if err != nil {
-			log.Error(command+" error: ", err)
+			log.Error(id+" error: ", err)
 		}
 	})
 }

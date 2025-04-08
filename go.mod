@@ -4,6 +4,7 @@ go 1.24.1
 
 require (
 	github.com/charmbracelet/log v0.4.1
+	github.com/gorilla/websocket v1.5.3
 	github.com/pion/ice/v4 v4.0.8
 	github.com/pion/webrtc/v4 v4.0.14
 )
@@ -37,4 +38,5 @@ require (
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
+	modernc.org/x11 v1.0.15 // indirect
 )
