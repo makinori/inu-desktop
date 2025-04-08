@@ -184,7 +184,7 @@ func writeAnswer(
 	offer []byte, path string,
 ) {
 	peer.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
-		log.Info(getRequestIP(r) + " " + state.String())
+		log.Info(getRequestIP(r) + " ice " + state.String())
 
 		if state == webrtc.ICEConnectionStateFailed {
 			peer.Close()
