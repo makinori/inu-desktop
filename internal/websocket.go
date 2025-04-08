@@ -61,7 +61,7 @@ func getMousePos(buf *bytes.Buffer) (int, int, bool) {
 }
 
 const EventTypeMouseMove = 0
-const EventTypeMouseDown = 1
+const EventTypeMouseClick = 1
 
 func handleMessage(buf *bytes.Buffer) {
 	eventType, err := buf.ReadByte()
@@ -86,7 +86,7 @@ func handleMessage(buf *bytes.Buffer) {
 
 		return
 
-	case EventTypeMouseDown:
+	case EventTypeMouseClick:
 		jsButton, err := buf.ReadByte()
 		if err != nil {
 			return

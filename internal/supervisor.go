@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"os"
 	"os/exec"
 	"time"
 
@@ -35,8 +34,8 @@ func (mgr *Supervisor) Add(id string, start func()) {
 func (mgr *Supervisor) AddSimple(id string, command string, arg ...string) {
 	mgr.Add(id, func() {
 		cmd := exec.Command(command, arg...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stdout
+		// cmd.Stdout = os.Stdout
+		// cmd.Stderr = os.Stdout
 
 		err := cmd.Run()
 
