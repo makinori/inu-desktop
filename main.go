@@ -94,11 +94,15 @@ func setupFFmpeg() {
 	// https://ffmpeg.org/ffmpeg-codecs.html#libopus-1
 	// https://github.com/pion/webrtc/issues/1514
 
+	// TODO: stream gets laggy after a while still
+
 	ffmpegAudioArgs = append(ffmpegAudioArgs,
 		"-c:a", "libopus", "-b:a", "128K", "-vbr", "on",
 		"-compression_level", "10", "-frame_duration", "20",
 		"-application", "lowdelay", "-sample_fmt", "s16", "-ssrc", "1",
-		"-vn", "-af", "adelay=0:all=true", "-async", "1",
+		"-vn",
+		// this might be the cause?
+		// "-af", "adelay=0:all=true", "-async", "1",
 		"-payload_type", "111", "-f", "rtp", "-max_delay", "0",
 		fmt.Sprintf("rtp://127.0.0.1:%d", inu.LocalRtpAudioPort),
 	)

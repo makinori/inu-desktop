@@ -83,7 +83,7 @@ func (x11 *X11) clickMouse(jsButton byte, down byte) {
 	C.XFlush(x11.display)
 }
 
-func (x11 *X11) keyPress(keysym uint32, down byte) {
+func (x11 *X11) keyPressNoFlush(keysym uint32, down byte) {
 	x11.ensureConnected()
 
 	keycode := C.XKeysymToKeycode(x11.display, C.KeySym(uint64(keysym)))
@@ -95,7 +95,10 @@ func (x11 *X11) keyPress(keysym uint32, down byte) {
 	if err == 0 {
 		return
 	}
+}
 
+func (x11 *X11) keyPress(keysym uint32, down byte) {
+	x11.keyPressNoFlush(keysym, down)
 	C.XFlush(x11.display)
 }
 
@@ -117,6 +120,25 @@ func (x11 *X11) scrollMouse(scrollDown bool) {
 	err = C.XTestFakeButtonEvent(x11.display, cButton, C.False, C.CurrentTime)
 	if err == 0 {
 		return
+	}
+
+	C.XFlush(x11.display)
+}
+
+func (x11 *X11) paste(text string) {
+	x11.ensureConnected()
+
+	// let go of keys first
+	x11.keyPressNoFlush(0xffe3, 0) // left ctrl
+	x11.keyPressNoFlush(0xffe4, 0) // right ctrl
+	x11.keyPressNoFlush(0x76, 0)   // v
+	x11.keyPressNoFlush(0x56, 0)   // V
+
+	// TODO: not accurate. '>' turns into '.'
+
+	for _, char := range text {
+		x11.keyPressNoFlush(uint32(char), 1)
+		x11.keyPressNoFlush(uint32(char), 0)
 	}
 
 	C.XFlush(x11.display)

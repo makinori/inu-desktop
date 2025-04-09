@@ -121,6 +121,7 @@
 		const video = document.getElementById("video");
 		const volumeSlider = document.getElementById("volume-slider");
 		const controlsCheckbox = document.getElementById("controls-checkbox");
+		const clipboardCheckbox = document.getElementById("clipboard-checkbox");
 
 		const url = new URL(document.URL);
 		const https = url.protocol.includes("https");
@@ -173,6 +174,12 @@
 			return [x, y];
 		}
 
+		const WSEventMouseMove = 0;
+		const WSEventMouseClick = 1;
+		const WSEventKeyPress = 2;
+		const WSEventScroll = 3;
+		const WSEventPaste = 4;
+
 		video.addEventListener("mousemove", e => {
 			if (!controlsCheckbox.checked) {
 				return;
@@ -186,7 +193,7 @@
 			}
 
 			const data = new Uint8Array([
-				0, // mouse move
+				WSEventMouseMove,
 				...convertTypedArray(new Float32Array(coords), Uint8Array),
 			]);
 
@@ -210,7 +217,7 @@
 			}
 
 			const data = new Uint8Array([
-				1, // mouse click
+				WSEventMouseClick,
 				e.button,
 				down ? 1 : 0,
 			]);
@@ -228,13 +235,33 @@
 
 		const keyboard = new Guacamole.Keyboard(document);
 
-		function sendKeyPress(keysym, down) {
+		async function sendKeyPress(keysym, down) {
 			if (!controlsCheckbox.checked) {
 				return;
 			}
 
+			// pressed ctrl v
+			if (
+				clipboardCheckbox.checked &&
+				down &&
+				(keysym == 0x76 || keysym == 0x56) && // v or V
+				keyboard.modifiers.ctrl
+			) {
+				const text = https
+					? await navigator.clipboard.readText()
+					: "need https to get clipboard";
+
+				const data = new Uint8Array([
+					WSEventPaste,
+					...new TextEncoder().encode(text),
+				]);
+
+				ws.send(data);
+				return;
+			}
+
 			const data = new Uint8Array([
-				2, // key press
+				WSEventKeyPress,
 				...convertTypedArray(new Uint32Array([keysym]), Uint8Array),
 				down ? 1 : 0,
 			]);
@@ -259,10 +286,7 @@
 				return;
 			}
 
-			const data = new Uint8Array([
-				3, // scroll
-				e.deltaY > 0 ? 1 : 0,
-			]);
+			const data = new Uint8Array([WSEventScroll, e.deltaY > 0 ? 1 : 0]);
 
 			ws.send(data);
 		});

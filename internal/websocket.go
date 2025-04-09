@@ -19,6 +19,7 @@ const WSEventMouseMove = 0
 const WSEventMouseClick = 1
 const WSEventKeyPress = 2
 const WSEventScroll = 3
+const WSEventPaste = 4
 
 func getWsMousePos(buf *bytes.Buffer) (int, int, bool) {
 	var x, y float32
@@ -99,6 +100,10 @@ func (inuWs *InuWebSocket) handleMessage(buf *bytes.Buffer) {
 
 		inuWs.x11.scrollMouse(scrollDown == 1)
 
+		return
+
+	case WSEventPaste:
+		inuWs.x11.paste(buf.String())
 		return
 	}
 }
