@@ -1,12 +1,14 @@
 services:
     inu-desktop:
         build: .
-        container_name: inu
+        hostname: inu
         ports:
             - 4845:4845/tcp
             - 4845:4845/udp
         sysctls:
             - net.ipv6.conf.all.disable_ipv6=1
+        volumes:
+            - ./mnt:/mnt
         environment:
             WEB_PORT: 4845
             UDP_PORT: 4845
@@ -15,6 +17,8 @@ services:
             SCREEN_WIDTH: 1920
             SCREEN_HEIGHT: 1080
             FRAMERATE: 60
+
+            # OUTPUT_LOGS: 1
         deploy:
             resources:
                 reservations:

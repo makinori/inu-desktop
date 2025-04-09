@@ -36,7 +36,9 @@ mpv bash sudo yt-dlp firefox \
 # fonts
 ttf-cascadia-code \
 # for building
-git debugedit binutils fakeroot go make gcc && \
+git debugedit binutils fakeroot go make gcc patch \
+# drivers
+nvidia-utils && \
 # clean up
 rm -rf /var/cache/pacman
 
@@ -52,23 +54,21 @@ sed -i "s/#ParallelDownloads/ParallelDownloads/" /etc/pacman.conf && \
 sed -i "s/^NoProgressBar/#NoProgressBar/" /etc/pacman.conf && \
 echo "[multilib]" >> /etc/pacman.conf && \
 echo "Include = /etc/pacman.d/mirrorlist" >> /etc/pacman.conf && \
-pacman -Sy
+pacman -Sy && \
+# generate locales and other
+echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen && locale-gen && \
+dbus-uuidgen --ensure
 
-RUN pacman -S --noconfirm \
-# drivers
-nvidia-utils lib32-nvidia-utils && \
-# clean up
-rm -rf /var/cache/pacman
-
-# generate locales
-RUN \
-echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen && locale-gen
 ENV \
 LANG=en_US.UTF-8 \
 LANGUAGE=en_US:en \
 LC_ALL=en_US.UTF-8
 
-# TODO: dbus-uuidgen > /var/lib/dbus/machine-id
+RUN pacman -S --noconfirm \
+# lib32 drivers
+lib32-nvidia-utils && \
+# clean up
+rm -rf /var/cache/pacman
 
 # get yay
 RUN \
@@ -77,6 +77,16 @@ chown -R inu:inu /yay && \
 cd /yay && su inu -c "makepkg" && \
 pacman -U --noconfirm *.tar.zst && \
 cd .. && rm -rf /yay
+
+# get from aur
+RUN \
+su inu -c "yay -S --noconfirm \
+otf-sn-pro papirus-icon-theme ff2mpv-native-messaging-host-git" && \
+rm -rf /home/inu/.cache
+
+# install user settings
+COPY user-settings.tar.gz /user-settings.tar.gz
+RUN tar -C /home/inu -xf /user-settings.tar.gz
 
 COPY --from=builder /build/inu-desktop /usr/bin/inu-desktop
 
