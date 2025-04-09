@@ -9,11 +9,18 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var (
-	wsUpgrader = &websocket.Upgrader{}
-)
+type InuWebSocket struct {
+	wsUpgrader websocket.Upgrader
 
-func getMousePos(buf *bytes.Buffer) (int, int, bool) {
+	x11 X11
+}
+
+const WSEventMouseMove = 0
+const WSEventMouseClick = 1
+const WSEventKeyPress = 2
+const WSEventScroll = 3
+
+func getWsMousePos(buf *bytes.Buffer) (int, int, bool) {
 	var x, y float32
 
 	err := binary.Read(buf, binary.LittleEndian, &x)
@@ -36,12 +43,7 @@ func getMousePos(buf *bytes.Buffer) (int, int, bool) {
 	return xInt, yInt, true
 }
 
-const WSEventMouseMove = 0
-const WSEventMouseClick = 1
-const WSEventKeyPress = 2
-const WSEventScroll = 3
-
-func handleMessage(buf *bytes.Buffer) {
+func (inuWs *InuWebSocket) handleMessage(buf *bytes.Buffer) {
 	eventType, err := buf.ReadByte()
 	if err != nil {
 		return
@@ -49,12 +51,12 @@ func handleMessage(buf *bytes.Buffer) {
 
 	switch eventType {
 	case WSEventMouseMove:
-		x, y, ok := getMousePos(buf)
+		x, y, ok := getWsMousePos(buf)
 		if !ok {
 			return
 		}
 
-		moveMouse(x, y)
+		inuWs.x11.moveMouse(x, y)
 
 		return
 
@@ -69,7 +71,7 @@ func handleMessage(buf *bytes.Buffer) {
 			return
 		}
 
-		clickMouse(jsButton, down)
+		inuWs.x11.clickMouse(jsButton, down)
 
 		return
 
@@ -85,7 +87,7 @@ func handleMessage(buf *bytes.Buffer) {
 			return
 		}
 
-		keyPress(keysym, down)
+		inuWs.x11.keyPress(keysym, down)
 
 		return
 
@@ -95,14 +97,14 @@ func handleMessage(buf *bytes.Buffer) {
 			return
 		}
 
-		scrollMouse(scrollDown == 1)
+		inuWs.x11.scrollMouse(scrollDown == 1)
 
 		return
 	}
 }
 
-func handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	ws, err := wsUpgrader.Upgrade(w, r, nil)
+func (inuWs *InuWebSocket) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	ws, err := inuWs.wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -122,10 +124,11 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		handleMessage(bytes.NewBuffer(message))
+		inuWs.handleMessage(bytes.NewBuffer(message))
 	}
 }
 
 func SetupWebSocket(httpMux *http.ServeMux) {
-	httpMux.HandleFunc("GET /api/ws", handleWebSocket)
+	var inuWs InuWebSocket
+	httpMux.HandleFunc("GET /api/ws", inuWs.handleWebSocket)
 }
