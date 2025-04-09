@@ -94,6 +94,8 @@ COPY --from=builder /build/inu-desktop /usr/bin/inu-desktop
 ENV DISPLAY=:0
 ENV XDG_SESSION_TYPE=x11
 
+ENV PULSE_LATENCY_MSEC=60
+
 ENV IN_CONTAINER=1
 
 CMD ["/usr/bin/inu-desktop"]

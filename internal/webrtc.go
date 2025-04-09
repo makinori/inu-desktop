@@ -13,7 +13,8 @@ import (
 
 var (
 	// localPort int
-	LocalRtpPort int
+	LocalRtpVideoPort int
+	LocalRtpAudioPort int
 
 	// localWebRTCAPI  *webrtc.API
 	publicWebRTCAPI *webrtc.API
@@ -327,6 +328,39 @@ func publicWhepHandler(w http.ResponseWriter, r *http.Request) {
 	writeAnswer(w, r, peer, offer, "/whep")
 }
 
+func rtpToTrack(port int, track *webrtc.TrackLocalStaticRTP) {
+	l, err := net.ListenUDP("udp", &net.UDPAddr{
+		IP: net.ParseIP("127.0.0.1"), Port: port,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	bufferSize := 300000 // 300KB
+	err = l.SetReadBuffer(bufferSize)
+	if err != nil {
+		panic(err)
+	}
+
+	defer func() {
+		err = l.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	packet := make([]byte, 1600)
+	for {
+		n, _, err := l.ReadFrom(packet)
+		if err != nil {
+			log.Error("error during read: %s\n", err)
+			continue
+		}
+
+		track.Write(packet[:n])
+	}
+}
+
 func SetupWebRTC(httpMux *http.ServeMux) {
 	mustSetupWebRTC()
 
@@ -345,44 +379,21 @@ func SetupWebRTC(httpMux *http.ServeMux) {
 	// }()
 
 	var err error
-	LocalRtpPort, err = getFreeUDPPort()
+
+	LocalRtpVideoPort, err = getFreeUDPPort()
 	if err != nil {
 		panic(err)
 	}
 
-	log.Infof("local rtp listening at %d", LocalRtpPort)
+	LocalRtpAudioPort, err = getFreeUDPPort()
+	if err != nil {
+		panic(err)
+	}
 
-	go func() {
-		l, err := net.ListenUDP("udp", &net.UDPAddr{
-			IP: net.ParseIP("127.0.0.1"), Port: LocalRtpPort,
-		})
-		if err != nil {
-			panic(err)
-		}
+	log.Infof(
+		"local rtp listening at %d and %d", LocalRtpVideoPort, LocalRtpAudioPort,
+	)
 
-		bufferSize := 300000 // 300KB
-		err = l.SetReadBuffer(bufferSize)
-		if err != nil {
-			panic(err)
-		}
-
-		defer func() {
-			err = l.Close()
-			if err != nil {
-				panic(err)
-			}
-		}()
-
-		packet := make([]byte, 1600)
-		for {
-			n, _, err := l.ReadFrom(packet)
-			if err != nil {
-				log.Error("error during read: %s\n", err)
-				continue
-			}
-
-			streamVideoTrack.Write(packet[:n])
-
-		}
-	}()
+	go rtpToTrack(LocalRtpVideoPort, streamVideoTrack)
+	go rtpToTrack(LocalRtpAudioPort, streamAudioTrack)
 }

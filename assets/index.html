@@ -109,6 +109,10 @@
 				<p>controls</p>
 				<input type="checkbox" id="controls-checkbox" />
 			</div>
+			<div class="control">
+				<p>clipboard</p>
+				<input type="checkbox" id="clipboard-checkbox" />
+			</div>
 		</div>
 	</body>
 	<script src="./js/guacamole-keyboard.js"></script>
@@ -194,6 +198,10 @@
 		});
 
 		function sendMouseDownUp(e, down) {
+			if (!controlsCheckbox.checked) {
+				return;
+			}
+
 			e.preventDefault();
 
 			const coords = getNormalizedCoords(e.offsetX, e.offsetY);

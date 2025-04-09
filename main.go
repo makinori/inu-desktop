@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/charmbracelet/log"
 	inu "github.com/makinori/inu-desktop/internal"
@@ -22,8 +23,11 @@ func setupFFmpeg() {
 
 	ffmpegArgs := []string{"-hide_banner", "-nostats", "-re"}
 
+	ffmpegVideoArgs := ffmpegArgs
+	ffmpegAudioArgs := ffmpegArgs
+
 	if inu.IN_CONTAINER {
-		ffmpegArgs = append(ffmpegArgs,
+		ffmpegVideoArgs = append(ffmpegVideoArgs,
 			"-video_size",
 			fmt.Sprintf("%dx%d", inu.SCREEN_WIDTH, inu.SCREEN_HEIGHT),
 			"-framerate", strconv.Itoa(inu.FRAMERATE),
@@ -35,12 +39,12 @@ func setupFFmpeg() {
 
 		const testPattern = true
 		if testPattern {
-			ffmpegArgs = append(ffmpegArgs,
+			ffmpegVideoArgs = append(ffmpegVideoArgs,
 				"-f", "lavfi", "-i", "testsrc",
 				"-sws_flags", "neighbor",
 			)
 		} else {
-			ffmpegArgs = append(ffmpegArgs,
+			ffmpegVideoArgs = append(ffmpegVideoArgs,
 				"-video_size",
 				fmt.Sprintf("%dx%d", inu.SCREEN_WIDTH, inu.SCREEN_HEIGHT),
 				"-framerate", strconv.Itoa(inu.FRAMERATE),
@@ -59,20 +63,50 @@ func setupFFmpeg() {
 
 	// ffmpeg -hide_banner -h encoder=h264_nvenc
 
-	ffmpegArgs = append(ffmpegArgs,
+	ffmpegVideoArgs = append(ffmpegVideoArgs,
 		"-filter:v", fmt.Sprintf("scale=%d:%d", inu.SCREEN_WIDTH, inu.SCREEN_HEIGHT),
 		"-pix_fmt", "yuv420p", "-profile:v", "baseline",
 		"-c:v", "h264_nvenc", "-b:v", "8000K",
 		"-rc", "cbr", "-preset", "p5", "-tune", "ull",
 		"-multipass", "qres", "-zerolatency", "1",
 		"-g", strconv.Itoa(inu.FRAMERATE/2), "-an", "-f", "rtp",
-		fmt.Sprintf("rtp://127.0.0.1:%d", inu.LocalRtpPort),
+		fmt.Sprintf("rtp://127.0.0.1:%d", inu.LocalRtpVideoPort),
 		// ?pkt_size=1316
 	)
 
 	mgr.AddSimple(
-		"ffmpeg",
-		"ffmpeg", ffmpegArgs...,
+		"ffmpeg-video",
+		"ffmpeg", ffmpegVideoArgs...,
+	)
+
+	// audio
+
+	if inu.IN_CONTAINER {
+		ffmpegAudioArgs = append(ffmpegAudioArgs,
+			"-f", "pulse", "-i", "auto_null.monitor",
+		)
+	} else {
+		ffmpegAudioArgs = append(ffmpegAudioArgs,
+			"-f", "lavfi", "-i", "sine=f=440:r=48000",
+		)
+	}
+
+	// https://ffmpeg.org/ffmpeg-codecs.html#libopus-1
+	// https://github.com/pion/webrtc/issues/1514
+
+	ffmpegAudioArgs = append(ffmpegAudioArgs,
+		"-c:a", "libopus", "-b:a", "128K", "-vbr", "on",
+		"-compression_level", "10", "-frame_duration", "20",
+		"-application", "lowdelay", "-sample_fmt", "s16", "-ssrc", "1",
+		"-vn", "-af", "adelay=0:all=true", "-async", "1",
+		"-payload_type", "111", "-f", "rtp", "-max_delay", "0",
+		fmt.Sprintf("rtp://127.0.0.1:%d", inu.LocalRtpAudioPort),
+	)
+
+	mgr.AddSimple(
+		"ffmpeg-audio",
+		"su", "inu", "-c",
+		"ffmpeg "+strings.Join(ffmpegAudioArgs, " "),
 	)
 }
 
