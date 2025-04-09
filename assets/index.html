@@ -242,6 +242,23 @@
 			sendKeyPress(keysym, false);
 		};
 
+		video.addEventListener("wheel", e => {
+			if (!controlsCheckbox.checked) {
+				return;
+			}
+
+			if (e.deltaY == 0) {
+				return;
+			}
+
+			const data = new Uint8Array([
+				3, // scroll
+				e.deltaY > 0 ? 1 : 0,
+			]);
+
+			ws.send(data);
+		});
+
 		// let peer = new RTCPeerConnection();
 		// peer = null;
 		let peer;

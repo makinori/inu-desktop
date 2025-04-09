@@ -56,9 +56,9 @@ func clickMouse(jsButton byte, down byte) {
 	var cErr C.int
 
 	if down == 1 {
-		cErr = C.XTestFakeButtonEvent(display, cButton, C.True, C.ulong(0))
+		cErr = C.XTestFakeButtonEvent(display, cButton, C.True, C.CurrentTime)
 	} else {
-		cErr = C.XTestFakeButtonEvent(display, cButton, C.False, C.ulong(0))
+		cErr = C.XTestFakeButtonEvent(display, cButton, C.False, C.CurrentTime)
 	}
 
 	if cErr == 0 {
@@ -76,11 +76,35 @@ func keyPress(keysym uint32, down byte) {
 	var cErr C.int
 
 	if down == 1 {
-		cErr = C.XTestFakeKeyEvent(display, C.uint(keycode), C.True, C.ulong(0))
+		cErr = C.XTestFakeKeyEvent(display, C.uint(keycode), C.True, C.CurrentTime)
 	} else {
-		cErr = C.XTestFakeKeyEvent(display, C.uint(keycode), C.False, C.ulong(0))
+		cErr = C.XTestFakeKeyEvent(display, C.uint(keycode), C.False, C.CurrentTime)
 	}
 
+	if cErr == 0 {
+		return
+	}
+
+	C.XFlush(display)
+}
+
+func scrollMouse(scrollDown bool) {
+	var cButton C.uint
+
+	if scrollDown {
+		cButton = 5 // scroll down
+	} else {
+		cButton = 4 // scroll up
+	}
+
+	ensureX11Connected()
+
+	cErr := C.XTestFakeButtonEvent(display, cButton, C.True, C.CurrentTime)
+	if cErr == 0 {
+		return
+	}
+
+	cErr = C.XTestFakeButtonEvent(display, cButton, C.False, C.CurrentTime)
 	if cErr == 0 {
 		return
 	}

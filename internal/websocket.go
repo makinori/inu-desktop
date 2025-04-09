@@ -39,6 +39,7 @@ func getMousePos(buf *bytes.Buffer) (int, int, bool) {
 const WSEventMouseMove = 0
 const WSEventMouseClick = 1
 const WSEventKeyPress = 2
+const WSEventScroll = 3
 
 func handleMessage(buf *bytes.Buffer) {
 	eventType, err := buf.ReadByte()
@@ -85,6 +86,16 @@ func handleMessage(buf *bytes.Buffer) {
 		}
 
 		keyPress(keysym, down)
+
+		return
+
+	case WSEventScroll:
+		scrollDown, err := buf.ReadByte()
+		if err != nil {
+			return
+		}
+
+		scrollMouse(scrollDown == 1)
 
 		return
 	}

@@ -86,7 +86,8 @@ rm -rf /home/inu/.cache
 
 # install user settings
 COPY user-settings.tar.gz /user-settings.tar.gz
-RUN tar -C /home/inu -xf /user-settings.tar.gz
+RUN tar -C /home/inu -xf /user-settings.tar.gz && \
+rm -f /user-settings.tar.gz
 
 COPY --from=builder /build/inu-desktop /usr/bin/inu-desktop
 
