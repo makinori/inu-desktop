@@ -9,14 +9,14 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/log"
-	inu "github.com/makinori/inu-desktop/internal"
+	. "github.com/makinori/inu-desktop/internal"
 )
 
 var (
 	//go:embed assets
 	staticContent embed.FS
 
-	mgr *inu.Supervisor = inu.NewSupervisor()
+	mgr *Supervisor = NewSupervisor()
 )
 
 func setupFFmpeg() {
@@ -26,11 +26,11 @@ func setupFFmpeg() {
 	ffmpegVideoArgs := ffmpegArgs
 	ffmpegAudioArgs := ffmpegArgs
 
-	if inu.IN_CONTAINER {
+	if IN_CONTAINER {
 		ffmpegVideoArgs = append(ffmpegVideoArgs,
 			"-video_size",
-			fmt.Sprintf("%dx%d", inu.SCREEN_WIDTH, inu.SCREEN_HEIGHT),
-			"-framerate", strconv.Itoa(inu.FRAMERATE),
+			fmt.Sprintf("%dx%d", SCREEN_WIDTH, SCREEN_HEIGHT),
+			"-framerate", strconv.Itoa(FRAMERATE),
 			"-f", "x11grab", "-i", ":0",
 		)
 
@@ -46,8 +46,8 @@ func setupFFmpeg() {
 		} else {
 			ffmpegVideoArgs = append(ffmpegVideoArgs,
 				"-video_size",
-				fmt.Sprintf("%dx%d", inu.SCREEN_WIDTH, inu.SCREEN_HEIGHT),
-				"-framerate", strconv.Itoa(inu.FRAMERATE),
+				fmt.Sprintf("%dx%d", SCREEN_WIDTH, SCREEN_HEIGHT),
+				"-framerate", strconv.Itoa(FRAMERATE),
 				"-f", "v4l2", "-i", "/dev/video0",
 			)
 		}
@@ -64,13 +64,13 @@ func setupFFmpeg() {
 	// ffmpeg -hide_banner -h encoder=h264_nvenc
 
 	ffmpegVideoArgs = append(ffmpegVideoArgs,
-		"-filter:v", fmt.Sprintf("scale=%d:%d", inu.SCREEN_WIDTH, inu.SCREEN_HEIGHT),
+		"-filter:v", fmt.Sprintf("scale=%d:%d", SCREEN_WIDTH, SCREEN_HEIGHT),
 		"-pix_fmt", "yuv420p", "-profile:v", "baseline",
 		"-c:v", "h264_nvenc", "-b:v", "8000K",
 		"-rc", "cbr", "-preset", "p5", "-tune", "ull",
 		"-multipass", "qres", "-zerolatency", "1",
-		"-g", strconv.Itoa(inu.FRAMERATE/2), "-an", "-f", "rtp",
-		fmt.Sprintf("rtp://127.0.0.1:%d", inu.LocalRtpVideoPort),
+		"-g", strconv.Itoa(FRAMERATE/2), "-an", "-f", "rtp",
+		fmt.Sprintf("rtp://127.0.0.1:%d", LocalRtpVideoPort),
 		// ?pkt_size=1316
 	)
 
@@ -81,7 +81,7 @@ func setupFFmpeg() {
 
 	// audio
 
-	if inu.IN_CONTAINER {
+	if IN_CONTAINER {
 		ffmpegAudioArgs = append(ffmpegAudioArgs,
 			"-f", "pulse", "-i", "auto_null.monitor",
 		)
@@ -104,7 +104,7 @@ func setupFFmpeg() {
 		// this might be the cause?
 		// "-af", "adelay=0:all=true", "-async", "1",
 		"-payload_type", "111", "-f", "rtp", "-max_delay", "0",
-		fmt.Sprintf("rtp://127.0.0.1:%d", inu.LocalRtpAudioPort),
+		fmt.Sprintf("rtp://127.0.0.1:%d", LocalRtpAudioPort),
 	)
 
 	mgr.AddSimple(
@@ -118,7 +118,7 @@ func setupDesktop() {
 	mgr.AddSimple(
 		"xvfb",
 		"Xvfb", ":0", "-screen", "0",
-		fmt.Sprintf("%dx%dx24", inu.SCREEN_WIDTH, inu.SCREEN_HEIGHT),
+		fmt.Sprintf("%dx%dx24", SCREEN_WIDTH, SCREEN_HEIGHT),
 	)
 
 	mgr.AddSimple(
@@ -147,16 +147,16 @@ func setupDesktop() {
 }
 
 func main() {
-	if !inu.IN_CONTAINER {
+	if !IN_CONTAINER {
 		log.Warn("not in container! skipping certain tasks")
 	}
 
 	httpMux := http.NewServeMux()
 
-	inu.SetupWebRTC(httpMux)
+	SetupWebRTC(httpMux)
 
-	if inu.IN_CONTAINER {
-		inu.SetupWebSocket(httpMux)
+	if IN_CONTAINER {
+		SetupWebSocket(httpMux)
 
 		assets, err := fs.Sub(staticContent, "assets")
 		if err != nil {
@@ -168,15 +168,15 @@ func main() {
 	}
 
 	mgr.Add("http", func() {
-		log.Infof("public http listening at http://0.0.0.0:%d", inu.WEB_PORT)
+		log.Infof("public http listening at http://0.0.0.0:%d", WEB_PORT)
 
-		err := http.ListenAndServe(":"+strconv.Itoa(inu.WEB_PORT), httpMux)
+		err := http.ListenAndServe(":"+strconv.Itoa(WEB_PORT), httpMux)
 		if err != nil {
 			log.Error(err)
 		}
 	})
 
-	if inu.IN_CONTAINER {
+	if IN_CONTAINER {
 		setupDesktop()
 	}
 
