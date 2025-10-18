@@ -1,3 +1,4 @@
 -   fetch public ip at regular intervals if empty
 -   resolve public ip if not an ip
--   fix ffmpeg audio slowing down
+-   use gstreamer
+-   user-settings.tar.gz is dumb

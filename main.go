@@ -20,7 +20,6 @@ var (
 )
 
 func setupFFmpeg() {
-
 	ffmpegArgs := []string{"-hide_banner", "-nostats", "-re"}
 
 	ffmpegVideoArgs := ffmpegArgs
@@ -33,7 +32,6 @@ func setupFFmpeg() {
 			"-framerate", strconv.Itoa(FRAMERATE),
 			"-f", "x11grab", "-i", ":0",
 		)
-
 	} else {
 		log.Warn("using test pattern for ffmpeg")
 
@@ -123,13 +121,18 @@ func setupDesktop() {
 
 	mgr.AddSimple(
 		"dbus",
-		"dbus-daemon", "--system", "--nofork", "--print-address",
+		"su", "inu", "-c",
+		"dbus-daemon --session --nofork --nopidfile",
+		// doesnt work DBUS_SESSION_BUS_ADDRESS is still tmp
+		// "--address=unix:path=/run/user/1000/bus",
+		// XDG_RUNTIME_DIR also doesnt get set
 	)
 
 	mgr.AddSimple(
 		"pulseaudio",
 		"su", "inu", "-c",
-		"dbus-launch pulseaudio --disallow-module-loading --disallow-exit --exit-idle-time=-1",
+		"dbus-launch pulseaudio --disallow-module-loading --disallow-exit "+
+			"--exit-idle-time=-1",
 	)
 
 	mgr.AddSimple(
