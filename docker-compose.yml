@@ -5,8 +5,6 @@ services:
         ports:
             - 4845:4845/tcp
             - 4845:4845/udp
-        sysctls:
-            - net.ipv6.conf.all.disable_ipv6=1
         volumes:
             - ./mnt:/mnt
         environment:
