@@ -23,14 +23,19 @@ RUN GOOS=linux go build -o inu-desktop .
 FROM archlinux:latest
 
 RUN \
+# update pacman conf
 sed -i "s/#Color/Color/" /etc/pacman.conf && \
 sed -i "s/#ParallelDownloads/ParallelDownloads/" /etc/pacman.conf && \
 sed -i "s/^NoProgressBar/#NoProgressBar/" /etc/pacman.conf && \
 echo "[multilib]" >> /etc/pacman.conf && \
 echo "Include = /etc/pacman.d/mirrorlist" >> /etc/pacman.conf && \
-pacman -Syu --noconfirm
-
-# TODO: reflector
+# update packages and get reflector
+pacman -Syu --noconfirm reflector && \
+# get fastest
+reflector --country US --latest 25 --score 25 --sort rate \
+--protocol https --verbose --save /etc/pacman.d/mirrorlist && \
+# clean up
+rm -rf /var/cache/pacman 
 
 RUN \
 pacman -S --noconfirm \
