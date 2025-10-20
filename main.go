@@ -19,97 +19,62 @@ var (
 	mgr *Supervisor = NewSupervisor()
 )
 
-func setupFFmpeg() {
-	ffmpegArgs := []string{"-hide_banner", "-nostats", "-re"}
+func setupGStreamer() {
+	videoSrc := "ximagesrc"
+	audioSrc := "pulsesrc device=auto_null.monitor"
 
-	ffmpegVideoArgs := ffmpegArgs
-	ffmpegAudioArgs := ffmpegArgs
-
-	if IN_CONTAINER {
-		ffmpegVideoArgs = append(ffmpegVideoArgs,
-			"-video_size",
-			fmt.Sprintf("%dx%d", SCREEN_WIDTH, SCREEN_HEIGHT),
-			"-framerate", strconv.Itoa(FRAMERATE),
-			"-f", "x11grab", "-i", ":0",
-		)
-	} else {
-		log.Warn("using test pattern for ffmpeg")
-
-		const testPattern = true
-		if testPattern {
-			ffmpegVideoArgs = append(ffmpegVideoArgs,
-				"-f", "lavfi", "-i", "testsrc",
-				"-sws_flags", "neighbor",
-			)
-		} else {
-			ffmpegVideoArgs = append(ffmpegVideoArgs,
-				"-video_size",
-				fmt.Sprintf("%dx%d", SCREEN_WIDTH, SCREEN_HEIGHT),
-				"-framerate", strconv.Itoa(FRAMERATE),
-				"-f", "v4l2", "-i", "/dev/video0",
-			)
-		}
+	if !IN_CONTAINER {
+		videoSrc = "videotestsrc"
+		audioSrc = "audiotestsrc freq=220"
 	}
 
-	// p1 fastest (lowest)
-	// p2 faster (lower)
-	// p3 fast (low)
-	// p4 medium (default)
-	// p5 slow (good)
-	// p6 slower (better)
-	// p7 slowest (best)
-
-	// ffmpeg -hide_banner -h encoder=h264_nvenc
-
-	ffmpegVideoArgs = append(ffmpegVideoArgs,
-		"-filter:v", fmt.Sprintf("scale=%d:%d", SCREEN_WIDTH, SCREEN_HEIGHT),
-		"-pix_fmt", "yuv420p", "-profile:v", "baseline",
-		"-c:v", "h264_nvenc", "-b:v", "8000K",
-		"-rc", "cbr", "-preset", "p5", "-tune", "ull",
-		"-multipass", "qres", "-zerolatency", "1",
-		"-g", strconv.Itoa(FRAMERATE/2), "-an", "-f", "rtp",
-		fmt.Sprintf("rtp://127.0.0.1:%d", LocalRtpVideoPort),
-		// ?pkt_size=1316
-	)
-
-	mgr.AddSimple(
-		"ffmpeg-video",
-		"ffmpeg", ffmpegVideoArgs...,
-	)
-
-	// audio
-
-	if IN_CONTAINER {
-		ffmpegAudioArgs = append(ffmpegAudioArgs,
-			"-f", "pulse", "-i", "auto_null.monitor",
-		)
-	} else {
-		ffmpegAudioArgs = append(ffmpegAudioArgs,
-			"-f", "lavfi", "-i", "sine=f=440:r=48000",
-		)
+	videoPipeline := []string{
+		videoSrc,
+		fmt.Sprintf(
+			"video/x-raw,width=%d,height=%d,framerate=%d/1", // ,format=NV12
+			SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE,
+		),
+		"videoconvert",
+		// https://gstreamer.freedesktop.org/documentation/nvcodec/nvh264enc.html
+		"nvh264enc " +
+			"bitrate=6000 " +
+			"rc-mode=2 " + // CBR
+			"tune=3 " + // Ultra low latency
+			"multi-pass=2 " + // Two pass with quarter resolution
+			"preset=5 " + // Low Latency, High Performance
+			"zerolatency=true " +
+			// Number of frames between intra frames
+			fmt.Sprintf("gop-size=%d", FRAMERATE),
+		"h264parse config-interval=-1",
+		"video/x-h264,stream-format=byte-stream,profile=constrained-baseline",
+		"rtph264pay",
+		fmt.Sprintf("udpsink host=127.0.0.1 port=%d", LocalRtpVideoPort),
 	}
 
-	// https://ffmpeg.org/ffmpeg-codecs.html#libopus-1
-	// https://github.com/pion/webrtc/issues/1514
+	// https://wiki.xiph.org/Opus_Recommended_Settings
+	audioPipeline := []string{
+		audioSrc,
+		"audioconvert",
+		"opusenc bitrate=320000",
+		"rtpopuspay",
+		fmt.Sprintf("udpsink host=127.0.0.1 port=%d", LocalRtpAudioPort),
+	}
 
-	// TODO: stream gets laggy after a while still
+	videoCommand := "gst-launch-1.0 --no-position " +
+		strings.Join(videoPipeline, " ! ")
 
-	ffmpegAudioArgs = append(ffmpegAudioArgs,
-		"-c:a", "libopus", "-b:a", "128K", "-vbr", "on",
-		"-compression_level", "10", "-frame_duration", "20",
-		"-application", "lowdelay", "-sample_fmt", "s16", "-ssrc", "1",
-		"-vn",
-		// this might be the cause?
-		// "-af", "adelay=0:all=true", "-async", "1",
-		"-payload_type", "111", "-f", "rtp", "-max_delay", "0",
-		fmt.Sprintf("rtp://127.0.0.1:%d", LocalRtpAudioPort),
-	)
+	audioCommand := "gst-launch-1.0 --no-position " +
+		strings.Join(audioPipeline, " ! ")
 
-	mgr.AddSimple(
-		"ffmpeg-audio",
-		"su", "inu", "-c",
-		"ffmpeg "+strings.Join(ffmpegAudioArgs, " "),
-	)
+	// set PULSE_LATENCY_MSEC really low?
+
+	if IN_CONTAINER {
+		mgr.AddSimple("gst-video", "sh", "-c", videoCommand)
+		mgr.AddSimple("gst-audio", "su", "inu", "-c", audioCommand)
+	} else {
+		mgr.AddSimple("gst-video", "sh", "-c", videoCommand)
+		mgr.AddSimple("gst-audio", "sh", "-c", audioCommand)
+	}
 }
 
 func setupDesktop() {
@@ -119,10 +84,16 @@ func setupDesktop() {
 		fmt.Sprintf("%dx%dx24", SCREEN_WIDTH, SCREEN_HEIGHT),
 	)
 
+	// userEnv := []string{
+	// 	"XDG_RUNTIME_DIR=/run/user/1000",
+	// 	"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus",
+	// }
+
 	mgr.AddSimple(
 		"dbus",
-		"su", "inu", "-c",
-		"dbus-daemon --session --nofork --nopidfile",
+		"dbus-daemon", "--system", "--nofork", "--nopidfile",
+		// "su", "inu", "-c",
+		// "dbus-daemon --session --nofork --nopidfile",
 		// doesnt work DBUS_SESSION_BUS_ADDRESS is still tmp
 		// "--address=unix:path=/run/user/1000/bus",
 		// XDG_RUNTIME_DIR also doesnt get set
@@ -183,7 +154,7 @@ func main() {
 		setupDesktop()
 	}
 
-	setupFFmpeg()
+	setupGStreamer()
 
 	mgr.Run()
 }

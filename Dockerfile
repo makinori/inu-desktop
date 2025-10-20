@@ -30,10 +30,13 @@ echo "[multilib]" >> /etc/pacman.conf && \
 echo "Include = /etc/pacman.d/mirrorlist" >> /etc/pacman.conf && \
 pacman -Syu --noconfirm
 
+# TODO: reflector
+
 RUN \
 pacman -S --noconfirm \
 # needed to run inu
-ffmpeg xfce4 xorg-server-xvfb dbus pulseaudio && \
+gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad \
+xfce4 xorg-server-xvfb dbus pulseaudio && \
 # newer mesa unfortunately breaks xvfb
 curl -o mesa.tar.zst https://archive.archlinux.org/packages/m/mesa/mesa-1%3A23.3.1-1-x86_64.pkg.tar.zst && \
 pacman -U --noconfirm mesa.tar.zst && \
@@ -69,19 +72,6 @@ chmod 1777 /tmp/.X11-unix && \
 echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen && locale-gen && \
 dbus-uuidgen --ensure
 
-ENV \
-LANG=en_US.UTF-8 \
-LANGUAGE=en_US:en \
-LC_ALL=en_US.UTF-8 \
-\
-PULSE_LATENCY_MSEC=60 \
-IN_CONTAINER=1 \
-\
-DISPLAY=:0 \
-XDG_SESSION_TYPE=x11
-# XDG_RUNTIME_DIR=/run/user/1000
-# DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
-
 # get yay
 RUN \
 git clone https://aur.archlinux.org/yay.git /yay && \
@@ -102,6 +92,16 @@ RUN tar -C /home/inu -xf /user-settings.tar.gz && \
 rm -f /user-settings.tar.gz
 
 COPY --from=builder /build/inu-desktop /usr/bin/inu-desktop
+
+ENV \
+LANG=en_US.UTF-8 \
+LANGUAGE=en_US:en \
+LC_ALL=en_US.UTF-8 \
+\
+IN_CONTAINER=1 \
+\
+DISPLAY=:0 \
+XDG_SESSION_TYPE=x11
 
 CMD ["/usr/bin/inu-desktop"]
 

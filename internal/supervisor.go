@@ -32,11 +32,13 @@ func (mgr *Supervisor) Add(id string, start func()) {
 	})
 }
 
+// TODO: allow adding env as well
+
 func (mgr *Supervisor) AddSimple(id string, command string, arg ...string) {
 	mgr.Add(id, func() {
 		cmd := exec.Command(command, arg...)
 
-		if OUTPUT_LOGS {
+		if SUPERVISOR_LOGS {
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stdout
 		}
@@ -44,7 +46,7 @@ func (mgr *Supervisor) AddSimple(id string, command string, arg ...string) {
 		err := cmd.Run()
 
 		if err != nil {
-			log.Error(id+" error:", err)
+			log.Error(id, "err", err.Error())
 		}
 	})
 }

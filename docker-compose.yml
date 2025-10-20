@@ -16,7 +16,7 @@ services:
             SCREEN_HEIGHT: 1080
             FRAMERATE: 60
 
-            # OUTPUT_LOGS: 1
+            SUPERVISOR_LOGS: 1
         deploy:
             resources:
                 reservations:

@@ -14,5 +14,5 @@ var (
 	SCREEN_HEIGHT, _ = strconv.Atoi(getEnv("SCREEN_HEIGHT", "1080"))
 	FRAMERATE, _     = strconv.Atoi(getEnv("FRAMERATE", "60"))
 
-	OUTPUT_LOGS = envExists("OUTPUT_LOGS")
+	SUPERVISOR_LOGS = envExists("SUPERVISOR_LOGS")
 )
