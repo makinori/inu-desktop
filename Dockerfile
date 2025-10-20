@@ -38,14 +38,18 @@ reflector --country US --latest 25 --score 25 --sort rate \
 rm -rf /var/cache/pacman 
 
 RUN \
-pacman -S --noconfirm \
-# needed to run inu
-gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad \
-xfce4 xorg-server-xvfb dbus pulseaudio && \
 # newer mesa unfortunately breaks xvfb
 curl -o mesa.tar.zst https://archive.archlinux.org/packages/m/mesa/mesa-1%3A23.3.1-1-x86_64.pkg.tar.zst && \
-pacman -U --noconfirm mesa.tar.zst && \
-rm -f mesa.tar.zst && \
+# debian 13 comes with nvidia 550 so we need to use that one
+curl -o nvidia-utils.tar.zst https://archive.archlinux.org/packages/n/nvidia-utils/nvidia-utils-550.90.07-4-x86_64.pkg.tar.zst && \
+curl -o lib32-nvidia-utils.tar.zst https://archive.archlinux.org/packages/l/lib32-nvidia-utils/lib32-nvidia-utils-550.90.07-1-x86_64.pkg.tar.zst && \
+# install above and clean up
+pacman -U --noconfirm *.tar.zst && \
+rm -f *.tar.zst && \
+# needed to run inu
+pacman -S --noconfirm \
+gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad \
+xfce4 xorg-server-xvfb dbus pulseaudio && \
 # clean up
 rm -rf /var/cache/pacman
 
@@ -55,9 +59,7 @@ mpv bash sudo yt-dlp firefox \
 # fonts
 ttf-cascadia-code \
 # for building
-git debugedit binutils fakeroot go make gcc patch \
-# drivers
-nvidia-utils lib32-nvidia-utils && \
+git debugedit binutils fakeroot go make gcc patch && \
 # clean up
 rm -rf /var/cache/pacman
 
