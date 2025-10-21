@@ -48,7 +48,7 @@ pacman -U --noconfirm *.tar.zst && \
 rm -f *.tar.zst && \
 # needed to run inu
 pacman -S --noconfirm \
-gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad \
+gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly \
 xfce4 xorg-server-xvfb dbus pulseaudio && \
 # clean up
 rm -rf /var/cache/pacman
