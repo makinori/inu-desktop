@@ -5,11 +5,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
-
-	"github.com/charmbracelet/log"
 )
 
 func readXauthData(buf *bytes.Buffer) ([]byte, error) {
@@ -100,7 +99,7 @@ func SetupXlib() {
 
 	conn, err := net.Dial("unix", "/tmp/.X11-unix/X0")
 	if err != nil {
-		log.Error("failed to connect to x11:", err)
+		slog.Error("failed to connect to x11", "err", err.Error())
 		return
 	}
 	defer conn.Close()
@@ -138,7 +137,7 @@ func SetupXlib() {
 	// 2 auth required
 
 	if buffer[0] != 1 {
-		log.Error("failed to auth to x11")
+		slog.Error("failed to auth to x11")
 		panic(true)
 	}
 

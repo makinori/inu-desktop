@@ -1,25 +1,27 @@
-package internal
+package src
 
 import (
 	"bytes"
 	"encoding/binary"
+	"log/slog"
 	"net/http"
 
-	"github.com/charmbracelet/log"
 	"github.com/gorilla/websocket"
+	"github.com/makinori/inu-desktop/src/config"
+	"github.com/makinori/inu-desktop/src/x11"
 )
 
 type InuWebSocket struct {
 	wsUpgrader websocket.Upgrader
-
-	x11 X11
 }
 
-const WSEventMouseMove = 0
-const WSEventMouseClick = 1
-const WSEventKeyPress = 2
-const WSEventScroll = 3
-const WSEventPaste = 4
+const (
+	WSEventMouseMove = iota
+	WSEventMouseClick
+	WSEventKeyPress
+	WSEventScroll
+	WSEventPaste
+)
 
 func getWsMousePos(buf *bytes.Buffer) (int, int, bool) {
 	var x, y float32
@@ -34,10 +36,11 @@ func getWsMousePos(buf *bytes.Buffer) (int, int, bool) {
 		return 0, 0, false
 	}
 
-	xInt := int(x * float32(SCREEN_WIDTH))
-	yInt := int(y * float32(SCREEN_HEIGHT))
+	xInt := int(x * float32(config.SCREEN_WIDTH))
+	yInt := int(y * float32(config.SCREEN_HEIGHT))
 
-	if xInt < 0 || yInt < 0 || xInt >= SCREEN_WIDTH || yInt >= SCREEN_HEIGHT {
+	if xInt < 0 || yInt < 0 ||
+		xInt >= config.SCREEN_WIDTH || yInt >= config.SCREEN_HEIGHT {
 		return 0, 0, false
 	}
 
@@ -57,7 +60,7 @@ func (inuWs *InuWebSocket) handleMessage(buf *bytes.Buffer) {
 			return
 		}
 
-		inuWs.x11.moveMouse(x, y)
+		x11.MoveMouse(x, y)
 
 		return
 
@@ -72,7 +75,7 @@ func (inuWs *InuWebSocket) handleMessage(buf *bytes.Buffer) {
 			return
 		}
 
-		inuWs.x11.clickMouse(jsButton, down)
+		x11.ClickMouse(jsButton, down)
 
 		return
 
@@ -88,7 +91,7 @@ func (inuWs *InuWebSocket) handleMessage(buf *bytes.Buffer) {
 			return
 		}
 
-		inuWs.x11.keyPress(keysym, down)
+		x11.KeyPress(keysym, down)
 
 		return
 
@@ -98,12 +101,12 @@ func (inuWs *InuWebSocket) handleMessage(buf *bytes.Buffer) {
 			return
 		}
 
-		inuWs.x11.scrollMouse(scrollDown == 1)
+		x11.ScrollMouse(scrollDown == 1)
 
 		return
 
 	case WSEventPaste:
-		inuWs.x11.paste(buf.String())
+		x11.Paste(buf.String())
 		return
 	}
 }
@@ -121,7 +124,7 @@ func (inuWs *InuWebSocket) handleWebSocket(w http.ResponseWriter, r *http.Reques
 	for {
 		messageType, message, err := ws.ReadMessage()
 		if err != nil {
-			log.Error("ws error:", err)
+			slog.Error("websocket", "err", err.Error())
 			return // close ws
 		}
 
@@ -133,7 +136,7 @@ func (inuWs *InuWebSocket) handleWebSocket(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func SetupWebSocket(httpMux *http.ServeMux) {
+func initWebSocket(httpMux *http.ServeMux) {
 	var inuWs InuWebSocket
 	httpMux.HandleFunc("GET /api/ws", inuWs.handleWebSocket)
 }

@@ -6,7 +6,7 @@ services:
             - 4845:4845/tcp
             - 4845:4845/udp
         volumes:
-            - ./mnt:/mnt
+            - ./persist:/home/inu/persist
         environment:
             WEB_PORT: 4845
             UDP_PORT: 4845
@@ -16,7 +16,8 @@ services:
             SCREEN_HEIGHT: 1080
             FRAMERATE: 60
 
-            SUPERVISOR_LOGS: 1
+            USE_NVIDIA: 1
+            # SUPERVISOR_LOGS: 1
         deploy:
             resources:
                 reservations:

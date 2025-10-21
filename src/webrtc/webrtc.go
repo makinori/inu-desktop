@@ -1,12 +1,14 @@
-package internal
+package webrtc
 
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
+	"strconv"
 
-	"github.com/charmbracelet/log"
+	"github.com/makinori/inu-desktop/src/config"
 	"github.com/pion/ice/v4"
 	"github.com/pion/webrtc/v4"
 )
@@ -89,11 +91,11 @@ func mustSetupWebRTC() {
 
 	// setup public setting engine
 
-	publicUDPMux, err := ice.NewMultiUDPMuxFromPort(UDP_PORT)
+	publicUDPMux, err := ice.NewMultiUDPMuxFromPort(config.UDP_PORT)
 	if err != nil {
 		panic(err)
 	}
-	log.Infof("public udp listening at %d", UDP_PORT)
+	slog.Info("public udp listening at " + strconv.Itoa(config.UDP_PORT))
 
 	publicSettingEngine := webrtc.SettingEngine{}
 	publicSettingEngine.SetLite(true)
@@ -107,12 +109,12 @@ func mustSetupWebRTC() {
 	})
 	publicSettingEngine.SetNAT1To1IPs(
 		[]string{
-			PUBLIC_IP, // TODO: use dns??
+			config.PUBLIC_IP, // TODO: use dns??
 		},
 		webrtc.ICECandidateTypeHost,
 	)
 
-	log.Infof("nat 1 to 1 set to %s", PUBLIC_IP)
+	slog.Info("nat 1 to 1 set to " + config.PUBLIC_IP)
 
 	// setup local setting engine
 
@@ -182,7 +184,7 @@ func writeAnswer(
 	offer []byte, path string,
 ) {
 	peer.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
-		log.Info(getRequestIP(r) + " ice " + state.String())
+		slog.Info(getRequestIP(r) + " ice " + state.String())
 
 		if state == webrtc.ICEConnectionStateFailed {
 			peer.Close()
@@ -353,7 +355,7 @@ func rtpToTrack(port int, track *webrtc.TrackLocalStaticRTP) {
 	for {
 		n, _, err := l.ReadFrom(packet)
 		if err != nil {
-			log.Error("error during read: %s\n", err)
+			slog.Error("rtp track read error", "err", err)
 			continue
 		}
 
@@ -361,7 +363,7 @@ func rtpToTrack(port int, track *webrtc.TrackLocalStaticRTP) {
 	}
 }
 
-func SetupWebRTC(httpMux *http.ServeMux) {
+func Init(httpMux *http.ServeMux) {
 	mustSetupWebRTC()
 
 	httpMux.HandleFunc("POST /whep", publicWhepHandler)
@@ -390,8 +392,9 @@ func SetupWebRTC(httpMux *http.ServeMux) {
 		panic(err)
 	}
 
-	log.Infof(
-		"local rtp listening at %d and %d", LocalRtpVideoPort, LocalRtpAudioPort,
+	slog.Info(
+		"local rtp listening", "video", LocalRtpVideoPort,
+		"audio", strconv.Itoa(LocalRtpAudioPort),
 	)
 
 	go rtpToTrack(LocalRtpVideoPort, streamVideoTrack)
