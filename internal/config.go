@@ -1,6 +1,9 @@
 package internal
 
-import "strconv"
+import (
+	"os"
+	"strconv"
+)
 
 var (
 	WEB_PORT, _ = strconv.Atoi(getEnv("WEB_PORT", "4845"))
@@ -14,5 +17,21 @@ var (
 	SCREEN_HEIGHT, _ = strconv.Atoi(getEnv("SCREEN_HEIGHT", "1080"))
 	FRAMERATE, _     = strconv.Atoi(getEnv("FRAMERATE", "60"))
 
+	USE_NVIDIA = envExists("USE_NVIDIA")
+
 	SUPERVISOR_LOGS = envExists("SUPERVISOR_LOGS")
 )
+
+func getEnv(key string, fallback string) string {
+	value, exists := os.LookupEnv(key)
+	if exists {
+		return value
+	} else {
+		return fallback
+	}
+}
+
+func envExists(key string) bool {
+	_, exists := os.LookupEnv(key)
+	return exists
+}

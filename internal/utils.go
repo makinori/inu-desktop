@@ -3,7 +3,6 @@ package internal
 import (
 	"net"
 	"net/http"
-	"os"
 	"strings"
 )
 
@@ -57,18 +56,4 @@ func getRequestIP(r *http.Request) string {
 	}
 
 	return removeLastPart(r.RemoteAddr, ":")
-}
-
-func getEnv(key string, fallback string) string {
-	value, exists := os.LookupEnv(key)
-	if exists {
-		return value
-	} else {
-		return fallback
-	}
-}
-
-func envExists(key string) bool {
-	_, exists := os.LookupEnv(key)
-	return exists
 }

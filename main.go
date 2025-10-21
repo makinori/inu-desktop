@@ -28,6 +28,27 @@ func setupGStreamer() {
 		audioSrc = "audiotestsrc freq=220"
 	}
 
+	// https://gstreamer.freedesktop.org/documentation/x264/index.html
+	videoEnc := "x264enc " +
+		"bitrate=6000 " +
+		"pass=cbr " +
+		"tune=zerolatency " +
+		"speed-preset=veryfast " +
+		fmt.Sprintf("key-int-max=%d", FRAMERATE)
+
+	if USE_NVIDIA {
+		// https://gstreamer.freedesktop.org/documentation/nvcodec/nvh264enc.html
+		videoEnc = "nvh264enc " +
+			"bitrate=6000 " +
+			"rc-mode=2 " + // CBR
+			"tune=3 " + // Ultra low latency
+			"multi-pass=2 " + // Two pass with quarter resolution
+			"preset=5 " + // Low Latency, High Performance
+			"zerolatency=true " +
+			// Number of frames between intra frames
+			fmt.Sprintf("gop-size=%d", FRAMERATE)
+	}
+
 	videoPipeline := []string{
 		videoSrc,
 		fmt.Sprintf(
@@ -35,24 +56,7 @@ func setupGStreamer() {
 			SCREEN_WIDTH, SCREEN_HEIGHT, FRAMERATE,
 		),
 		"videoconvert",
-		// https://gstreamer.freedesktop.org/documentation/nvcodec/nvh264enc.html
-		// "nvh264enc " +
-		// 	"bitrate=6000 " +
-		// 	"rc-mode=2 " + // CBR
-		// 	"tune=3 " + // Ultra low latency
-		// 	"multi-pass=2 " + // Two pass with quarter resolution
-		// 	"preset=5 " + // Low Latency, High Performance
-		// 	"zerolatency=true " +
-		// 	// Number of frames between intra frames
-		// 	fmt.Sprintf("gop-size=%d", FRAMERATE),
-		// having issues getting nvh264enc to work on debian 13
-		// https://gstreamer.freedesktop.org/documentation/x264/index.html?gi-language=c#GstX264EncPreset
-		"x264enc " +
-			"bitrate=6000 " +
-			"pass=cbr " +
-			"tune=zerolatency " +
-			"speed-preset=veryfast " +
-			fmt.Sprintf("key-int-max=%d", FRAMERATE),
+		videoEnc,
 		"h264parse config-interval=-1",
 		"video/x-h264,stream-format=byte-stream,profile=constrained-baseline",
 		"rtph264pay",
