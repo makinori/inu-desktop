@@ -18,7 +18,7 @@ var (
 	//go:embed assets
 	staticContent embed.FS
 
-	processes *supervisor.Supervisor = supervisor.NewSupervisor()
+	processes = supervisor.New()
 )
 
 func initGStreamer() {

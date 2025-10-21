@@ -13,6 +13,7 @@ var (
 	rootWindow C.Window
 )
 
+// TODO just make this an init function
 func ensureConnected() bool {
 	if display != nil {
 		return true

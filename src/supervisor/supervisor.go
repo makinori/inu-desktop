@@ -20,7 +20,7 @@ type Supervisor struct {
 	Running     bool
 }
 
-func NewSupervisor() *Supervisor {
+func New() *Supervisor {
 	return &Supervisor{
 		RestartTime: time.Second * 5,
 	}
