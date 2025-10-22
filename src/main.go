@@ -12,9 +12,9 @@ import (
 	"strings"
 
 	"github.com/makinori/inu-desktop/src/config"
+	"github.com/makinori/inu-desktop/src/inuwebrtc"
 	"github.com/makinori/inu-desktop/src/inuws"
 	"github.com/makinori/inu-desktop/src/supervisor"
-	"github.com/makinori/inu-desktop/src/webrtc"
 )
 
 var (
@@ -69,7 +69,7 @@ func initGStreamer() {
 		"h264parse config-interval=-1",
 		"video/x-h264,stream-format=byte-stream,profile=constrained-baseline",
 		"rtph264pay",
-		fmt.Sprintf("udpsink host=127.0.0.1 port=%d", webrtc.LocalRtpVideoPort),
+		fmt.Sprintf("udpsink host=127.0.0.1 port=%d", inuwebrtc.LocalRtpVideoPort),
 	}
 
 	// https://wiki.xiph.org/Opus_Recommended_Settings
@@ -78,7 +78,7 @@ func initGStreamer() {
 		"audioconvert",
 		"opusenc bitrate=320000",
 		"rtpopuspay",
-		fmt.Sprintf("udpsink host=127.0.0.1 port=%d", webrtc.LocalRtpAudioPort),
+		fmt.Sprintf("udpsink host=127.0.0.1 port=%d", inuwebrtc.LocalRtpAudioPort),
 	}
 
 	videoCommand := "gst-launch-1.0 --no-position " +
@@ -194,9 +194,9 @@ func Main() {
 
 	httpMux := http.NewServeMux()
 
-	webrtc.Init(httpMux)
+	inuwebrtc.Init(httpMux)
 
-	inuws.Init(httpMux, &webrtc.ViewerCount, webrtc.ViewerCountSignal)
+	inuws.Init(httpMux, &inuwebrtc.ViewerCount, inuwebrtc.ViewerCountSignal)
 
 	if config.IN_CONTAINER {
 		assets, err := fs.Sub(staticContent, "assets")
@@ -210,8 +210,7 @@ func Main() {
 
 	processes.AddSimple("http", func() error {
 		slog.Info(
-			"public http listening at http://0.0.0.0:" +
-				strconv.Itoa(config.WEB_PORT),
+			"public http listening at " + strconv.Itoa(config.WEB_PORT),
 		)
 
 		err := http.ListenAndServe(":"+strconv.Itoa(config.WEB_PORT), httpMux)
@@ -230,7 +229,7 @@ func Main() {
 
 	initGStreamer()
 
-	webrtc.ViewerCountSignal.AddListener(
+	inuwebrtc.ViewerCountSignal.AddListener(
 		func(ctx context.Context, value uint32) {
 			if value == 0 {
 				processes.Stop("gst-video")

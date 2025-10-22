@@ -1,4 +1,4 @@
-package webrtc
+package inuwebrtc
 
 import (
 	"net"

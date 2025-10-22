@@ -12,7 +12,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/makinori/inu-desktop/src/config"
-	"github.com/makinori/inu-desktop/src/webrtc"
 	"github.com/makinori/inu-desktop/src/x11"
 	"github.com/maniartech/signals"
 )
@@ -150,7 +149,7 @@ func sendViewerCountMessage(conn *websocket.Conn, value uint32) {
 }
 
 func onConnected(conn *websocket.Conn) {
-	sendViewerCountMessage(conn, webrtc.ViewerCount.Load())
+	sendViewerCountMessage(conn, viewerCount.Load())
 }
 
 func onDisconnected(conn *websocket.Conn) {
