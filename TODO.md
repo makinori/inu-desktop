@@ -2,6 +2,5 @@
 -   resolve public ip if not an ip
 -   user-settings.tar.gz is dumb
 -   sticky keys for ctrl,shift,alt
--   show who's online
 -   web page auto reconnect
 -   disable -debug packages with yay
