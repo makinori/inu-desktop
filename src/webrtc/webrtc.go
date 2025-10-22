@@ -1,14 +1,19 @@
 package webrtc
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"slices"
 	"strconv"
+	"sync"
+	"sync/atomic"
 
 	"github.com/makinori/inu-desktop/src/config"
+	"github.com/maniartech/signals"
 	"github.com/pion/ice/v4"
 	"github.com/pion/webrtc/v4"
 )
@@ -37,6 +42,12 @@ var (
 
 	// sdpH264RegExp = regexp.MustCompile("(?i)rtpmap:([0-9]+) h264")
 	// sdpOpusRegExp = regexp.MustCompile("(?i)rtpmap:([0-9]+) opus")
+
+	connectedPeers      []*webrtc.PeerConnection
+	connectedPeersMutex sync.RWMutex
+
+	ViewerCount       atomic.Uint32
+	ViewerCountSignal = signals.New[uint32]()
 )
 
 func mustSetupWebRTC() {
@@ -290,6 +301,19 @@ func writeAnswer(
 // 	writeAnswer(w, peer, offer, "/whip")
 // }
 
+func updateViewerCount() {
+	connectedPeersMutex.RLock()
+	value := uint32(len(connectedPeers))
+	connectedPeersMutex.RUnlock()
+
+	if ViewerCount.Load() == value {
+		return
+	}
+
+	ViewerCount.Store(value)
+	ViewerCountSignal.Emit(context.Background(), value)
+}
+
 func publicWhepHandler(w http.ResponseWriter, r *http.Request) {
 	offer, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -300,6 +324,34 @@ func publicWhepHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
+
+	peer.OnConnectionStateChange(func(connState webrtc.PeerConnectionState) {
+		switch connState {
+		case webrtc.PeerConnectionStateConnected:
+			connectedPeersMutex.Lock()
+			if slices.Contains(connectedPeers, peer) {
+				return
+			}
+			connectedPeers = append(connectedPeers, peer)
+			connectedPeersMutex.Unlock()
+
+			updateViewerCount()
+
+		case webrtc.PeerConnectionStateDisconnected,
+			webrtc.PeerConnectionStateFailed,
+			webrtc.PeerConnectionStateClosed:
+
+			connectedPeersMutex.Lock()
+			i := slices.Index(connectedPeers, peer)
+			if i < 0 {
+				break
+			}
+			connectedPeers = slices.Delete(connectedPeers, i, i+1)
+			connectedPeersMutex.Unlock()
+
+			updateViewerCount()
+		}
+	})
 
 	rtpVideoSender, err := peer.AddTrack(streamVideoTrack)
 	if err != nil {

@@ -98,6 +98,10 @@
 			.icon-button {
 				cursor: pointer;
 			}
+
+			.controls > p {
+				font-weight: 600;
+			}
 		</style>
 	</head>
 	<body>
@@ -163,6 +167,8 @@
 				src="./icons/rotate-right.svg"
 				height="24"
 			/>
+			<div class="controls-seperator"></div>
+			<p id="viewers-text"></p>
 		</div>
 	</body>
 	<script src="./js/guacamole-keyboard.js"></script>
@@ -206,6 +212,8 @@
 		const clipboardDownload = document.getElementById("clipboard-download");
 
 		const reloadButton = document.getElementById("reload");
+
+		const viewersText = document.getElementById("viewers-text");
 
 		const url = new URL(document.URL);
 		const https = url.protocol.includes("https");
@@ -267,6 +275,11 @@
 			controls.checked = !controls.checked;
 		});
 
+		let initElDismissed = false;
+		function canControl() {
+			return initElDismissed && controls.checked;
+		}
+
 		function convertTypedArray(src, type) {
 			const buffer = new ArrayBuffer(src.byteLength);
 			const baseView = new src.constructor(buffer).set(src);
@@ -308,9 +321,10 @@
 		const WSEventScroll = 3;
 		const WSEventClipboardUpload = 4;
 		const WSEventClipboardDownload = 5;
+		const WSEventViewerCount = 6;
 
 		video.addEventListener("mousemove", e => {
-			if (!controls.checked) {
+			if (!canControl()) {
 				return;
 			}
 
@@ -334,7 +348,7 @@
 		});
 
 		function sendMouseDownUp(e, down) {
-			if (!controls.checked) {
+			if (!canControl()) {
 				return;
 			}
 
@@ -365,7 +379,7 @@
 		const keyboard = new Guacamole.Keyboard(document);
 
 		async function sendKeyPress(keysym, down) {
-			if (!controls.checked) {
+			if (!canControl()) {
 				return;
 			}
 
@@ -387,7 +401,7 @@
 		};
 
 		video.addEventListener("wheel", e => {
-			if (!controls.checked) {
+			if (!canControl()) {
 				return;
 			}
 
@@ -488,6 +502,12 @@
 			ws.send(new Uint8Array([WSEventClipboardDownload]));
 		});
 
+		function plural(n, single, plural = null) {
+			if (plural == null) plural = single + "s";
+			if (n == 1 || n == -1) return n + " " + single;
+			else return n + " " + plural;
+		}
+
 		ws.addEventListener("message", async e => {
 			if (e.data.size == 0) {
 				return;
@@ -497,12 +517,20 @@
 
 			switch (data[0]) {
 				case WSEventClipboardDownload:
-					const value = new TextDecoder().decode(data.slice(1));
+					const clipboard = new TextDecoder().decode(data.slice(1));
 					try {
 						await navigator.clipboard.writeText(value);
 					} catch (error) {
 						alert("failed to set system clipboard:\n" + error);
 					}
+					break;
+
+				case WSEventViewerCount:
+					const viewers = convertTypedArray(
+						data.slice(1),
+						Uint32Array,
+					)[0];
+					viewersText.textContent = plural(viewers, "viewer");
 					break;
 			}
 		});
@@ -512,6 +540,7 @@
 		initEl.addEventListener("click", () => {
 			initEl.remove();
 			video.play();
+			initElDismissed = true;
 		});
 	</script>
 </html>

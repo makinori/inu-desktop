@@ -1,17 +1,30 @@
-package src
+package inuws
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"log/slog"
 	"net/http"
+	"slices"
+	"sync"
+	"sync/atomic"
 
 	"github.com/gorilla/websocket"
 	"github.com/makinori/inu-desktop/src/config"
+	"github.com/makinori/inu-desktop/src/webrtc"
 	"github.com/makinori/inu-desktop/src/x11"
+	"github.com/maniartech/signals"
 )
 
-var wsUpgrader websocket.Upgrader
+var (
+	upgrader websocket.Upgrader
+
+	conns      []*websocket.Conn
+	connsMutex sync.RWMutex
+
+	viewerCount *atomic.Uint32
+)
 
 const (
 	WSEventMouseMove = iota
@@ -20,9 +33,10 @@ const (
 	WSEventScroll
 	WSEventClipboardUpload
 	WSEventClipboardDownload
+	WSEventViewerCount
 )
 
-func getWsMousePos(buf *bytes.Buffer) (int, int, bool) {
+func getMousePos(buf *bytes.Buffer) (int, int, bool) {
 	var x, y float32
 
 	err := binary.Read(buf, binary.LittleEndian, &x)
@@ -58,7 +72,7 @@ func handleMessage(conn *websocket.Conn, buf *bytes.Buffer) {
 			return
 		}
 
-		x, y, ok := getWsMousePos(buf)
+		x, y, ok := getMousePos(buf)
 		if !ok {
 			return
 		}
@@ -128,19 +142,58 @@ func handleMessage(conn *websocket.Conn, buf *bytes.Buffer) {
 	}
 }
 
-func handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := wsUpgrader.Upgrade(w, r, nil)
+func sendViewerCountMessage(conn *websocket.Conn, value uint32) {
+	buf := bytes.NewBuffer(nil)
+	buf.WriteByte(WSEventViewerCount)
+	binary.Write(buf, binary.LittleEndian, value)
+	conn.WriteMessage(websocket.BinaryMessage, buf.Bytes())
+}
+
+func onConnected(conn *websocket.Conn) {
+	sendViewerCountMessage(conn, webrtc.ViewerCount.Load())
+}
+
+func onDisconnected(conn *websocket.Conn) {
+}
+
+func handleEndpoint(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer conn.Close()
 
+	connsMutex.Lock()
+	conns = append(conns, conn)
+	connsMutex.Unlock()
+
+	conn.SetCloseHandler(func(_ int, _ string) error {
+		connsMutex.Lock()
+		defer connsMutex.Unlock()
+
+		i := slices.Index(conns, conn)
+		if i < 0 {
+			return nil
+		}
+
+		conns = slices.Delete(conns, i, i+1)
+
+		onDisconnected(conn)
+
+		return nil
+	})
+
+	onConnected(conn)
+
 	// TODO: limit by framerate
 
 	for {
 		messageType, message, err := conn.ReadMessage()
 		if err != nil {
+			if websocket.IsCloseError(err, websocket.CloseGoingAway) {
+				return
+			}
 			slog.Error("websocket", "err", err.Error())
 			return // close ws
 		}
@@ -153,6 +206,25 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func initWebSocket(httpMux *http.ServeMux) {
-	httpMux.HandleFunc("GET /api/ws", handleWebSocket)
+func onViewerCountChanged(value uint32) {
+	connsMutex.RLock()
+	defer connsMutex.RUnlock()
+
+	for _, conn := range conns {
+		sendViewerCountMessage(conn, value)
+	}
+}
+
+func Init(
+	httpMux *http.ServeMux,
+	viewerCountPtr *atomic.Uint32,
+	viewerCountSignal signals.Signal[uint32],
+) {
+	httpMux.HandleFunc("GET /api/ws", handleEndpoint)
+
+	viewerCount = viewerCountPtr
+
+	viewerCountSignal.AddListener(func(_ context.Context, value uint32) {
+		onViewerCountChanged(value)
+	})
 }

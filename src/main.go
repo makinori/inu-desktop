@@ -1,6 +1,7 @@
 package src
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"io/fs"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/makinori/inu-desktop/src/config"
+	"github.com/makinori/inu-desktop/src/inuws"
 	"github.com/makinori/inu-desktop/src/supervisor"
 	"github.com/makinori/inu-desktop/src/webrtc"
 )
@@ -88,16 +90,27 @@ func initGStreamer() {
 	// TODO: set PULSE_LATENCY_MSEC really low?
 
 	processes.AddCommand(supervisor.Command{
-		ID:      "gst-video",
-		Command: "sh",
-		Args:    []string{"-c", videoCommand},
+		ID:          "gst-video",
+		Command:     "sh",
+		Args:        []string{"-c", videoCommand},
+		NoAutoStart: true,
 	})
 
-	processes.AddCommand(supervisor.Command{
-		ID:      "gst-audio",
-		Command: "su",
-		Args:    []string{"inu", "-c", audioCommand},
-	})
+	if config.IN_CONTAINER {
+		processes.AddCommand(supervisor.Command{
+			ID:          "gst-audio",
+			Command:     "su",
+			Args:        []string{"inu", "-c", audioCommand},
+			NoAutoStart: true,
+		})
+	} else {
+		processes.AddCommand(supervisor.Command{
+			ID:          "gst-audio",
+			Command:     "sh",
+			Args:        []string{"-c", audioCommand},
+			NoAutoStart: true,
+		})
+	}
 }
 
 func initGlobalEnv() {
@@ -183,7 +196,7 @@ func Main() {
 
 	webrtc.Init(httpMux)
 
-	initWebSocket(httpMux)
+	inuws.Init(httpMux, &webrtc.ViewerCount, webrtc.ViewerCountSignal)
 
 	if config.IN_CONTAINER {
 		assets, err := fs.Sub(staticContent, "assets")
@@ -195,7 +208,7 @@ func Main() {
 		httpMux.Handle("/", http.FileServer(http.Dir("src/assets/")))
 	}
 
-	processes.Add("http", func() {
+	processes.AddSimple("http", func() error {
 		slog.Info(
 			"public http listening at http://0.0.0.0:" +
 				strconv.Itoa(config.WEB_PORT),
@@ -205,6 +218,8 @@ func Main() {
 		if err != nil {
 			slog.Error(err.Error())
 		}
+
+		return nil
 	})
 
 	initGlobalEnv()
@@ -214,6 +229,18 @@ func Main() {
 	}
 
 	initGStreamer()
+
+	webrtc.ViewerCountSignal.AddListener(
+		func(ctx context.Context, value uint32) {
+			if value == 0 {
+				processes.Stop("gst-video")
+				processes.Stop("gst-audio")
+			} else {
+				processes.Start("gst-video")
+				processes.Start("gst-audio")
+			}
+		},
+	)
 
 	processes.Run()
 }

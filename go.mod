@@ -4,6 +4,7 @@ go 1.25.3
 
 require (
 	github.com/gorilla/websocket v1.5.3
+	github.com/maniartech/signals v1.3.1
 	github.com/pion/ice/v4 v4.0.8
 	github.com/pion/webrtc/v4 v4.0.14
 )

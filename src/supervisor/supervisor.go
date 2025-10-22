@@ -1,6 +1,8 @@
 package supervisor
 
 import (
+	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -10,12 +12,15 @@ import (
 )
 
 type Process struct {
-	ID    string
-	Start func()
+	ID         string
+	Start      func() error
+	Stop       func()
+	Running    bool
+	nowRunning chan struct{}
 }
 
 type Supervisor struct {
-	Processes   []Process
+	Processes   []*Process
 	RestartTime time.Duration
 	Running     bool
 }
@@ -26,23 +31,41 @@ func New() *Supervisor {
 	}
 }
 
-func (supervisor *Supervisor) Add(id string, start func()) {
-	supervisor.Processes = append(supervisor.Processes, Process{
-		ID:    id,
-		Start: start,
+func (supervisor *Supervisor) AddSimple(id string, start func() error) {
+	supervisor.Processes = append(supervisor.Processes, &Process{
+		ID:         id,
+		Start:      start,
+		Running:    true,
+		nowRunning: make(chan struct{}, 1),
 	})
 }
 
 type Command struct {
-	ID      string
-	Command string
-	Args    []string
-	Env     []string
+	ID          string
+	Command     string
+	Args        []string
+	Env         []string
+	NoAutoStart bool
 }
 
 func (supervisor *Supervisor) AddCommand(command Command) {
-	supervisor.Add(command.ID, func() {
-		cmd := exec.Command(command.Command, command.Args...)
+	var process *Process = &Process{
+		ID:         command.ID,
+		Running:    !command.NoAutoStart,
+		nowRunning: make(chan struct{}, 1),
+	}
+
+	process.Start = func() error {
+		ctx, stop := context.WithCancel(
+			context.Background(),
+		)
+
+		process.Stop = func() {
+			slog.Info("stopping " + process.ID + "...")
+			stop()
+		}
+
+		cmd := exec.CommandContext(ctx, command.Command, command.Args...)
 		cmd.Env = command.Env
 
 		if config.SUPERVISOR_LOGS {
@@ -52,10 +75,77 @@ func (supervisor *Supervisor) AddCommand(command Command) {
 
 		err := cmd.Run()
 
-		if err != nil {
-			slog.Error(command.ID, "err", err.Error())
+		// dont print error if the context was stopped
+		if ctx.Err() != nil {
+			return nil
 		}
-	})
+
+		return err
+	}
+
+	supervisor.Processes = append(supervisor.Processes, process)
+}
+
+func (supervisor *Supervisor) processLoop(process *Process) {
+	if process.Running {
+		slog.Info("starting " + process.ID + "...")
+		err := process.Start()
+		if err != nil {
+			slog.Error(process.ID, "err", err.Error())
+			time.Sleep(supervisor.RestartTime)
+		}
+	} else {
+		<-process.nowRunning
+	}
+	supervisor.processLoop(process)
+}
+
+func (supervisor *Supervisor) findByID(id string) *Process {
+	for _, process := range supervisor.Processes {
+		if process.ID == id {
+			return process
+		}
+	}
+	return nil
+}
+
+func (supervisor *Supervisor) Start(id string) error {
+	process := supervisor.findByID(id)
+	if process == nil {
+		return errors.New("failed to find process")
+	}
+
+	if process.Running {
+		return errors.New("process already running")
+	}
+
+	process.Running = true
+
+	// avoid blocking
+	if len(process.nowRunning) == 0 {
+		process.nowRunning <- struct{}{}
+	}
+
+	return nil
+}
+
+func (supervisor *Supervisor) Stop(id string) error {
+	process := supervisor.findByID(id)
+	if process == nil {
+		return errors.New("failed to find process")
+	}
+
+	if !process.Running {
+		return errors.New("process already stopped")
+	}
+
+	process.Running = false
+
+	if process.Stop != nil {
+		process.Stop()
+	}
+
+	return nil
 }
 
 func (supervisor *Supervisor) Run() {
@@ -66,16 +156,7 @@ func (supervisor *Supervisor) Run() {
 	supervisor.Running = true
 
 	for _, process := range supervisor.Processes {
-		var run func()
-
-		run = func() {
-			slog.Info("starting " + process.ID + "...")
-			process.Start()
-			time.Sleep(supervisor.RestartTime)
-			run()
-		}
-
-		go run()
+		go supervisor.processLoop(process)
 	}
 
 	select {}
