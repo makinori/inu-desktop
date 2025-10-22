@@ -11,7 +11,7 @@ import (
 )
 
 func initGStreamer() {
-	videoSrc := "ximagesrc"
+	videoSrc := "ximagesrc use-damage=false"
 	audioSrc := "pulsesrc device=auto_null.monitor"
 
 	if !config.IN_CONTAINER {

@@ -50,8 +50,10 @@ rm -f *.tar.zst && \
 # needed to run inu
 pacman -S --noconfirm \
 gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly \
-xfce4 xorg-server-xvfb xclip dbus pulseaudio \
-nvidia-utils lib32-nvidia-utils libva-nvidia-driver && \
+nvidia-utils lib32-nvidia-utils libva-nvidia-driver virtualgl opencl-nvidia \
+xorg-server-xvfb xclip dbus pulseaudio \
+openbox obconf-qt tint2 rxvt-unicode feh \
+&& \
 # clean up
 rm -rf /var/cache/pacman
 
@@ -95,20 +97,13 @@ rm -rf /var/cache/pacman
 # get from aur
 RUN \
 su inu -c "yay -Sy --noconfirm \
-otf-sn-pro papirus-icon-theme ff2mpv-native-messaging-host-git" && \
+otf-sn-pro papirus-icon-theme obmenu-generator" && \
 # clean up
 rm -rf /home/inu/.cache && \
 rm -rf /var/cache/pacman
 
-RUN pacman -Sy --noconfirm virtualgl opencl-nvidia && \
-# clean up
-rm -rf /var/cache/pacman
-
-
-# install user settings
-COPY user-settings.tar.gz /user-settings.tar.gz
-RUN tar -C /home/inu -xf /user-settings.tar.gz && \
-rm -f /user-settings.tar.gz
+COPY --chown=inu:inu config/openbox /home/inu/.config/openbox
+COPY --chown=inu:inu config/tint2 /home/inu/.config/tint2
 
 COPY --from=builder /build/inu-desktop /usr/bin/inu-desktop
 

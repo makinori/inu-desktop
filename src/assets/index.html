@@ -483,8 +483,9 @@
 		});
 
 		clipboardUpload.addEventListener("click", async () => {
+			let text = "";
 			try {
-				const text = https
+				text = https
 					? await navigator.clipboard.readText()
 					: "need https to get clipboard";
 			} catch (error) {
@@ -520,7 +521,7 @@
 				case WSEventClipboardDownload:
 					const clipboard = new TextDecoder().decode(data.slice(1));
 					try {
-						await navigator.clipboard.writeText(value);
+						await navigator.clipboard.writeText(clipboard);
 					} catch (error) {
 						alert("failed to set system clipboard:\n" + error);
 					}

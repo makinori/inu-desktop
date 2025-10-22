@@ -47,35 +47,27 @@ func initDesktop() {
 		// XDG_RUNTIME_DIR also doesnt get set
 	})
 
-	processes.AddCommand(supervisor.Command{
-		ID:      "pulseaudio",
-		Command: "su",
-		Args: []string{
-			"inu", "-c",
-			"dbus-launch pulseaudio --disallow-module-loading --disallow-exit " +
-				"--exit-idle-time=-1",
-		},
-	})
-
-	xfceCommand := "dbus-launch xfce4-session --display :0"
-
-	if config.USE_NVIDIA {
-		xfceCommand = "vglrun " + xfceCommand
+	runAsInu := func(id string, command string, withVGL bool) {
+		if withVGL && config.USE_NVIDIA {
+			command = "vglrun " + command
+		}
+		command = "dbus-launch " + command
+		processes.AddCommand(supervisor.Command{
+			ID:      id,
+			Dir:     "/home/inu",
+			Command: "su",
+			Args:    []string{"inu", "-c", command},
+		})
 	}
 
-	processes.AddCommand(supervisor.Command{
-		ID:      "xfce",
-		Command: "su",
-		Args:    []string{"inu", "-c", xfceCommand},
-	})
+	runAsInu(
+		"pulseaudio",
+		"pulseaudio --disallow-module-loading --disallow-exit "+
+			"--exit-idle-time=-1",
+		false,
+	)
 
-	// need systemd-login
-	// processes.AddCommand(supervisor.Command{
-	// 	ID:      "gnome",
-	// 	Command: "su",
-	// 	Args: []string{
-	// 		"inu", "-c",
-	// 		"dbus-launch gnome-shell --x11 -d :0",
-	// 	},
-	// })
+	// runAsInu("xfce", "xfce4-session --display :0", true)
+
+	runAsInu("openbox", "openbox-session", true)
 }

@@ -45,6 +45,7 @@ type Command struct {
 	Command     string
 	Args        []string
 	Env         []string
+	Dir         string
 	NoAutoStart bool
 }
 
@@ -67,6 +68,7 @@ func (supervisor *Supervisor) AddCommand(command Command) {
 
 		cmd := exec.CommandContext(ctx, command.Command, command.Args...)
 		cmd.Env = command.Env
+		cmd.Dir = command.Dir
 
 		if config.SUPERVISOR_LOGS {
 			cmd.Stdout = os.Stdout

@@ -1,0 +1,3 @@
+xset -b
+tint2 &
+feh --bg-fill ~/.config/openbox/squirrel.jpg &
