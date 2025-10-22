@@ -157,6 +157,8 @@ func writeAnswer(
 		}
 	})
 
+	// fmt.Println(string(offer))
+
 	err := peer.SetRemoteDescription(webrtc.SessionDescription{
 		Type: webrtc.SDPTypeOffer,
 		SDP:  string(offer),
@@ -167,7 +169,9 @@ func writeAnswer(
 		panic(err)
 	}
 
-	// TODO: should trickle
+	// can trickle ice packets with a PATCH request
+	// however i dont think it makes any sense when using nat1to1
+
 	gatherComplete := webrtc.GatheringCompletePromise(peer)
 
 	answer, err := peer.CreateAnswer(nil)
@@ -187,7 +191,6 @@ func writeAnswer(
 	w.Header().Add("Location", path)
 	w.WriteHeader(http.StatusCreated)
 
-	// uncomment to see server's sdp
 	// fmt.Println(peer.LocalDescription().SDP)
 
 	fmt.Fprint(w, peer.LocalDescription().SDP)

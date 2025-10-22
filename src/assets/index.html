@@ -447,6 +447,7 @@
 				peer.close();
 			}
 
+			// no stun cause we're doing nat1to1
 			peer = new RTCPeerConnection();
 
 			peer.addEventListener("iceconnectionstatechange", onIceChange);
