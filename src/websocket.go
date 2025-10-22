@@ -11,16 +11,15 @@ import (
 	"github.com/makinori/inu-desktop/src/x11"
 )
 
-type InuWebSocket struct {
-	wsUpgrader websocket.Upgrader
-}
+var wsUpgrader websocket.Upgrader
 
 const (
 	WSEventMouseMove = iota
 	WSEventMouseClick
 	WSEventKeyPress
 	WSEventScroll
-	WSEventPaste
+	WSEventClipboardUpload
+	WSEventClipboardDownload
 )
 
 func getWsMousePos(buf *bytes.Buffer) (int, int, bool) {
@@ -47,7 +46,7 @@ func getWsMousePos(buf *bytes.Buffer) (int, int, bool) {
 	return xInt, yInt, true
 }
 
-func (inuWs *InuWebSocket) handleMessage(buf *bytes.Buffer) {
+func handleMessage(conn *websocket.Conn, buf *bytes.Buffer) {
 	eventType, err := buf.ReadByte()
 	if err != nil {
 		return
@@ -55,6 +54,10 @@ func (inuWs *InuWebSocket) handleMessage(buf *bytes.Buffer) {
 
 	switch eventType {
 	case WSEventMouseMove:
+		if !config.IN_CONTAINER {
+			return
+		}
+
 		x, y, ok := getWsMousePos(buf)
 		if !ok {
 			return
@@ -62,9 +65,11 @@ func (inuWs *InuWebSocket) handleMessage(buf *bytes.Buffer) {
 
 		x11.MoveMouse(x, y)
 
-		return
-
 	case WSEventMouseClick:
+		if !config.IN_CONTAINER {
+			return
+		}
+
 		jsButton, err := buf.ReadByte()
 		if err != nil {
 			return
@@ -77,9 +82,11 @@ func (inuWs *InuWebSocket) handleMessage(buf *bytes.Buffer) {
 
 		x11.ClickMouse(jsButton, down)
 
-		return
-
 	case WSEventKeyPress:
+		if !config.IN_CONTAINER {
+			return
+		}
+
 		var keysym uint32
 		err := binary.Read(buf, binary.LittleEndian, &keysym)
 		if err != nil {
@@ -93,9 +100,11 @@ func (inuWs *InuWebSocket) handleMessage(buf *bytes.Buffer) {
 
 		x11.KeyPress(keysym, down)
 
-		return
-
 	case WSEventScroll:
+		if !config.IN_CONTAINER {
+			return
+		}
+
 		scrollDown, err := buf.ReadByte()
 		if err != nil {
 			return
@@ -103,26 +112,34 @@ func (inuWs *InuWebSocket) handleMessage(buf *bytes.Buffer) {
 
 		x11.ScrollMouse(scrollDown == 1)
 
-		return
+	case WSEventClipboardUpload:
+		x11.SetClipboard(buf.String())
 
-	case WSEventPaste:
-		x11.Paste(buf.String())
-		return
+	case WSEventClipboardDownload:
+		value, err := x11.GetClipboard()
+		if err != nil {
+			return
+		}
+
+		conn.WriteMessage(websocket.BinaryMessage, append([]byte{
+			WSEventClipboardDownload,
+		}, value...))
+
 	}
 }
 
-func (inuWs *InuWebSocket) handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	ws, err := inuWs.wsUpgrader.Upgrade(w, r, nil)
+func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	conn, err := wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer ws.Close()
+	defer conn.Close()
 
 	// TODO: limit by framerate
 
 	for {
-		messageType, message, err := ws.ReadMessage()
+		messageType, message, err := conn.ReadMessage()
 		if err != nil {
 			slog.Error("websocket", "err", err.Error())
 			return // close ws
@@ -132,11 +149,10 @@ func (inuWs *InuWebSocket) handleWebSocket(w http.ResponseWriter, r *http.Reques
 			continue
 		}
 
-		inuWs.handleMessage(bytes.NewBuffer(message))
+		handleMessage(conn, bytes.NewBuffer(message))
 	}
 }
 
 func initWebSocket(httpMux *http.ServeMux) {
-	var inuWs InuWebSocket
-	httpMux.HandleFunc("GET /api/ws", inuWs.handleWebSocket)
+	httpMux.HandleFunc("GET /api/ws", handleWebSocket)
 }

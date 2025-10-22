@@ -1,8 +1,6 @@
 -   fetch public ip at regular intervals if empty
 -   resolve public ip if not an ip
--   use gstreamer
 -   user-settings.tar.gz is dumb
--   clipboard buttons to upload and download
 -   sticky keys for ctrl,shift,alt
 -   show who's online
 -   web page auto reconnect

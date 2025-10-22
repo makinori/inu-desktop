@@ -6,14 +6,14 @@
 				font-family: "SN Pro";
 				font-style: normal;
 				font-display: swap;
-				src: url(/fonts/SNPro-VariableRegular.woff2) format("woff2");
+				src: url(./fonts/SNPro-VariableRegular.woff2) format("woff2");
 			}
 
 			@font-face {
 				font-family: "SN Pro";
 				font-style: italic;
 				font-display: swap;
-				src: url(/fonts/SNPro-VariableItalic.woff2) format("woff2");
+				src: url(./fonts/SNPro-VariableItalic.woff2) format("woff2");
 			}
 
 			* {
@@ -22,10 +22,7 @@
 			}
 
 			:root {
-				--controls-height: 64px;
-				--controls-gap: 24px;
-				--control-height: 36px;
-				--controls-padding: 24px;
+				--controls-height: 48px;
 			}
 
 			body {
@@ -45,7 +42,7 @@
 				height: calc(100vh - var(--controls-height));
 			}
 
-			#controls {
+			.controls-background {
 				position: fixed;
 				margin: auto;
 				left: 0;
@@ -53,11 +50,28 @@
 				bottom: 0;
 				height: var(--controls-height);
 				background-color: #111;
+			}
+
+			.controls {
+				position: fixed;
+				margin: auto;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				height: var(--controls-height);
+				padding: 0 24px;
+				opacity: 0.5;
+			}
+
+			.hstack {
 				display: flex;
 				align-items: center;
-				justify-content: flex-start;
-				padding: 0 var(--controls-padding);
-				gap: var(--controls-gap);
+				justify-content: center;
+				gap: 8px;
+			}
+
+			.controls-seperator {
+				margin: 0 12px;
 			}
 
 			#init {
@@ -70,58 +84,128 @@
 				display: flex;
 				align-items: center;
 				justify-content: center;
-				background-color: rgba(17, 17, 17, 0.8);
+				background-color: rgba(17, 17, 17, 0.85);
 				z-index: 9999;
 				text-align: center;
-			}
-
-			.control {
-				height: var(--control-height);
-				display: flex;
-				flex-direction: column;
-				align-items: center;
-				justify-content: space-between;
+				cursor: pointer;
 			}
 
 			#volume-slider {
 				width: 150px;
+				filter: grayscale(1);
+			}
+
+			.icon-button {
+				cursor: pointer;
 			}
 		</style>
 	</head>
 	<body>
 		<div id="init">
-			<h1>click here<br />to play</h1>
+			<img src="./icons/volume.svg" height="128" />
 		</div>
 		<video id="video" autoplay></video>
-		<div id="controls">
-			<div class="control">
-				<p>volume</p>
-				<input
-					type="range"
-					min="0"
-					max="1"
-					value="0"
-					step="0.01"
-					id="volume-slider"
+		<div class="controls-background"></div>
+		<div class="controls hstack">
+			<img
+				id="volume-mute"
+				class="icon-button"
+				src="./icons/volume.svg"
+				x-icon-false="./icons/volume.svg"
+				x-icon-true="./icons/volume-slash.svg"
+				height="24"
+			/>
+			<input
+				type="range"
+				min="0"
+				max="1"
+				value="0"
+				step="0.01"
+				id="volume-slider"
+			/>
+			<div class="controls-seperator"></div>
+			<div class="hstack" style="gap: 4px">
+				<img
+					src="./icons/clipboard-list.svg"
+					height="28"
+					style="opacity: 0.5"
+				/>
+				<img
+					title="Upload Clipboard"
+					id="clipboard-upload"
+					class="icon-button"
+					src="./icons/arrow-up-to-line.svg"
+					height="26"
+				/>
+				<img
+					title="Download Clipboard"
+					id="clipboard-download"
+					class="icon-button"
+					src="./icons/arrow-down-to-line.svg"
+					height="26"
 				/>
 			</div>
-			<div class="control">
-				<p>controls</p>
-				<input type="checkbox" id="controls-checkbox" />
-			</div>
-			<div class="control">
-				<p>clipboard</p>
-				<input type="checkbox" id="clipboard-checkbox" />
-			</div>
+			<div class="controls-seperator"></div>
+			<img
+				title="Toggle Controls"
+				id="controls-toggle"
+				class="icon-button"
+				src="./icons/arrow-pointer.svg"
+				x-icon-true="./icons/arrow-pointer.svg"
+				x-icon-false="./icons/arrow-pointer-slash.svg"
+				height="26"
+			/>
+			<div class="controls-seperator"></div>
+			<img
+				title="Reload"
+				id="reload"
+				class="icon-button"
+				src="./icons/rotate-right.svg"
+				height="24"
+			/>
 		</div>
 	</body>
 	<script src="./js/guacamole-keyboard.js"></script>
 	<script>
+		function iconBoolBinding(el, defaultValue = false) {
+			let checked = defaultValue;
+			const updateIcon = () => {
+				if (checked) {
+					el.src = el.getAttribute("x-icon-true");
+				} else {
+					el.src = el.getAttribute("x-icon-false");
+				}
+			};
+			updateIcon();
+			return {
+				el,
+				set checked(value) {
+					checked = value;
+					updateIcon();
+				},
+				get checked() {
+					return checked;
+				},
+			};
+		}
+
 		const initEl = document.getElementById("init");
 		const video = document.getElementById("video");
+
 		const volumeSlider = document.getElementById("volume-slider");
-		const controlsCheckbox = document.getElementById("controls-checkbox");
-		const clipboardCheckbox = document.getElementById("clipboard-checkbox");
+		const volumeMute = iconBoolBinding(
+			document.getElementById("volume-mute"),
+		);
+
+		const controls = iconBoolBinding(
+			document.getElementById("controls-toggle"),
+			true,
+		);
+
+		const clipboardUpload = document.getElementById("clipboard-upload");
+		const clipboardDownload = document.getElementById("clipboard-download");
+
+		const reloadButton = document.getElementById("reload");
 
 		const url = new URL(document.URL);
 		const https = url.protocol.includes("https");
@@ -129,15 +213,59 @@
 			(https ? "wss://" : "ws://") + url.host + "/api/ws",
 		);
 
-		video.volume = 0.8;
-
-		volumeSlider.value = video.volume;
-
 		volumeSlider.addEventListener("input", e => {
 			video.volume = Number(e.target.value);
 		});
 
-		controlsCheckbox.checked = true;
+		volumeMute.el.addEventListener("click", () => {
+			video.muted = !volumeMute.checked;
+		});
+
+		var lastVolume;
+		var lastMuted;
+		function updateVolumeControls() {
+			if (lastVolume == video.volume && lastMuted == video.muted) {
+				return;
+			}
+			lastVolume = video.volume;
+			lastMuted = video.muted;
+			if (video.volume == 0 || video.muted) {
+				volumeMute.checked = true;
+				volumeSlider.value = 0;
+			} else {
+				volumeMute.checked = false;
+				volumeSlider.value = video.volume;
+			}
+		}
+
+		video.addEventListener("volumechange", () => {
+			localStorage.setItem(
+				"volume",
+				JSON.stringify({
+					volume: video.volume,
+					muted: video.muted,
+				}),
+			);
+			updateVolumeControls();
+		});
+
+		video.volume = 0.8;
+		video.muted = false;
+
+		const savedVolume = localStorage.getItem("volume");
+		if (savedVolume) {
+			try {
+				const { volume, muted } = JSON.parse(savedVolume);
+				video.volume = volume;
+				video.muted = muted;
+			} catch (error) {}
+		}
+
+		updateVolumeControls();
+
+		controls.el.addEventListener("click", () => {
+			controls.checked = !controls.checked;
+		});
 
 		function convertTypedArray(src, type) {
 			const buffer = new ArrayBuffer(src.byteLength);
@@ -178,10 +306,11 @@
 		const WSEventMouseClick = 1;
 		const WSEventKeyPress = 2;
 		const WSEventScroll = 3;
-		const WSEventPaste = 4;
+		const WSEventClipboardUpload = 4;
+		const WSEventClipboardDownload = 5;
 
 		video.addEventListener("mousemove", e => {
-			if (!controlsCheckbox.checked) {
+			if (!controls.checked) {
 				return;
 			}
 
@@ -205,7 +334,7 @@
 		});
 
 		function sendMouseDownUp(e, down) {
-			if (!controlsCheckbox.checked) {
+			if (!controls.checked) {
 				return;
 			}
 
@@ -236,27 +365,7 @@
 		const keyboard = new Guacamole.Keyboard(document);
 
 		async function sendKeyPress(keysym, down) {
-			if (!controlsCheckbox.checked) {
-				return;
-			}
-
-			// pressed ctrl v
-			if (
-				clipboardCheckbox.checked &&
-				down &&
-				(keysym == 0x76 || keysym == 0x56) && // v or V
-				keyboard.modifiers.ctrl
-			) {
-				const text = https
-					? await navigator.clipboard.readText()
-					: "need https to get clipboard";
-
-				const data = new Uint8Array([
-					WSEventPaste,
-					...new TextEncoder().encode(text),
-				]);
-
-				ws.send(data);
+			if (!controls.checked) {
 				return;
 			}
 
@@ -278,7 +387,7 @@
 		};
 
 		video.addEventListener("wheel", e => {
-			if (!controlsCheckbox.checked) {
+			if (!controls.checked) {
 				return;
 			}
 
@@ -353,6 +462,42 @@
 				type: "answer",
 			});
 		}
+
+		reloadButton.addEventListener("click", () => {
+			document.location = document.location;
+		});
+
+		clipboardUpload.addEventListener("click", async () => {
+			const text = https
+				? await navigator.clipboard.readText()
+				: "need https to get clipboard";
+
+			const data = new Uint8Array([
+				WSEventClipboardUpload,
+				...new TextEncoder().encode(text),
+			]);
+
+			ws.send(data);
+		});
+
+		clipboardDownload.addEventListener("click", () => {
+			ws.send(new Uint8Array([WSEventClipboardDownload]));
+		});
+
+		ws.addEventListener("message", async e => {
+			if (e.data.size == 0) {
+				return;
+			}
+
+			const data = await e.data.bytes();
+
+			switch (data[0]) {
+				case WSEventClipboardDownload:
+					const value = new TextDecoder().decode(data.slice(1));
+					await navigator.clipboard.writeText(value);
+					break;
+			}
+		});
 
 		init();
 

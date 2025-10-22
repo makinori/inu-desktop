@@ -6,7 +6,11 @@ package x11
 #include <X11/extensions/XTest.h>
 */
 import "C"
-import "log/slog"
+import (
+	"bytes"
+	"log/slog"
+	"os/exec"
+)
 
 var (
 	display    *C.Display
@@ -81,7 +85,7 @@ func ClickMouse(jsButton byte, down byte) {
 	C.XFlush(display)
 }
 
-func keyPressNoFlush(keysym uint32, down byte) {
+func KeyPress(keysym uint32, down byte) {
 	ensureConnected()
 
 	keycode := C.XKeysymToKeycode(display, C.KeySym(uint64(keysym)))
@@ -93,10 +97,7 @@ func keyPressNoFlush(keysym uint32, down byte) {
 	if err == 0 {
 		return
 	}
-}
 
-func KeyPress(keysym uint32, down byte) {
-	keyPressNoFlush(keysym, down)
 	C.XFlush(display)
 }
 
@@ -115,29 +116,25 @@ func ScrollMouse(scrollDown bool) {
 		return
 	}
 
+	defer C.XFlush(display)
+
 	err = C.XTestFakeButtonEvent(display, cButton, C.False, C.CurrentTime)
 	if err == 0 {
 		return
 	}
-
-	C.XFlush(display)
 }
 
-func Paste(text string) {
-	ensureConnected()
+func SetClipboard(text string) {
+	cmd := exec.Command("xclip", "-selection", "clipboard")
+	cmd.Stdin = bytes.NewBufferString(text)
+	cmd.Run()
+}
 
-	// let go of keys first
-	keyPressNoFlush(0xffe3, 0) // left ctrl
-	keyPressNoFlush(0xffe4, 0) // right ctrl
-	keyPressNoFlush(0x76, 0)   // v
-	keyPressNoFlush(0x56, 0)   // V
-
-	// TODO: not accurate. '>' turns into '.'
-
-	for _, char := range text {
-		keyPressNoFlush(uint32(char), 1)
-		keyPressNoFlush(uint32(char), 0)
+func GetClipboard() (string, error) {
+	cmd := exec.Command("xclip", "-selection", "clipboard", "-o")
+	value, err := cmd.Output()
+	if err != nil {
+		return "", err
 	}
-
-	C.XFlush(display)
+	return string(value), nil
 }

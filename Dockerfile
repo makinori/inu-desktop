@@ -40,6 +40,7 @@ RUN \
 # newer mesa unfortunately breaks xvfb
 curl -o mesa.tar.zst https://archive.archlinux.org/packages/m/mesa/mesa-1%3A23.3.1-1-x86_64.pkg.tar.zst && \
 # debian 13 comes with nvidia 550 so we need to use that one
+# downgrading here however breaks gstreamer, so just keep nvidia up to date 
 # curl -o nvidia-utils.tar.zst https://archive.archlinux.org/packages/n/nvidia-utils/nvidia-utils-550.90.07-4-x86_64.pkg.tar.zst && \
 # curl -o lib32-nvidia-utils.tar.zst https://archive.archlinux.org/packages/l/lib32-nvidia-utils/lib32-nvidia-utils-550.90.07-1-x86_64.pkg.tar.zst && \
 # install above and clean up
@@ -48,7 +49,7 @@ rm -f *.tar.zst && \
 # needed to run inu
 pacman -S --noconfirm \
 gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly \
-xfce4 xorg-server-xvfb dbus pulseaudio \
+xfce4 xorg-server-xvfb xclip dbus pulseaudio \
 nvidia-utils lib32-nvidia-utils && \
 # clean up
 rm -rf /var/cache/pacman

@@ -147,17 +147,16 @@ func Main() {
 
 	webrtc.Init(httpMux)
 
-	if config.IN_CONTAINER {
-		initWebSocket(httpMux)
+	initWebSocket(httpMux)
 
+	if config.IN_CONTAINER {
 		assets, err := fs.Sub(staticContent, "assets")
 		if err != nil {
 			panic(err)
 		}
-
 		httpMux.Handle("/", http.FileServerFS(assets))
 	} else {
-		httpMux.Handle("/", http.FileServer(http.Dir("assets/")))
+		httpMux.Handle("/", http.FileServer(http.Dir("src/assets/")))
 	}
 
 	processes.Add("http", func() {
