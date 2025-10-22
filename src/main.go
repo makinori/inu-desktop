@@ -3,7 +3,6 @@ package src
 import (
 	"context"
 	"embed"
-	"io/fs"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -32,15 +31,7 @@ func Main() {
 
 	inuws.Init(httpMux, &inuwebrtc.ViewerCount, inuwebrtc.ViewerCountSignal)
 
-	if config.IN_CONTAINER {
-		assets, err := fs.Sub(staticContent, "assets")
-		if err != nil {
-			panic(err)
-		}
-		httpMux.Handle("/", http.FileServerFS(assets))
-	} else {
-		httpMux.Handle("/", http.FileServer(http.Dir("src/assets/")))
-	}
+	initWeb(httpMux)
 
 	processes.AddSimple("http", func() error {
 		slog.Info(
