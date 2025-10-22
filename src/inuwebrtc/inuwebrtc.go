@@ -110,6 +110,7 @@ func initWebRTC() {
 	})
 	settingEngine.SetNetworkTypes([]webrtc.NetworkType{
 		webrtc.NetworkTypeUDP4,
+		webrtc.NetworkTypeUDP6,
 	})
 	settingEngine.SetNAT1To1IPs(
 		[]string{
