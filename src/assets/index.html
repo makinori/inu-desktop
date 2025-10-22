@@ -468,9 +468,13 @@
 		});
 
 		clipboardUpload.addEventListener("click", async () => {
-			const text = https
-				? await navigator.clipboard.readText()
-				: "need https to get clipboard";
+			try {
+				const text = https
+					? await navigator.clipboard.readText()
+					: "need https to get clipboard";
+			} catch (error) {
+				alert("failed to get system clipboard:\n" + error);
+			}
 
 			const data = new Uint8Array([
 				WSEventClipboardUpload,
@@ -494,7 +498,11 @@
 			switch (data[0]) {
 				case WSEventClipboardDownload:
 					const value = new TextDecoder().decode(data.slice(1));
-					await navigator.clipboard.writeText(value);
+					try {
+						await navigator.clipboard.writeText(value);
+					} catch (error) {
+						alert("failed to set system clipboard:\n" + error);
+					}
 					break;
 			}
 		});

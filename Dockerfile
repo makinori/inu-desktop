@@ -37,6 +37,7 @@ reflector --country US --latest 25 --score 25 --sort rate \
 rm -rf /var/cache/pacman 
 
 RUN \
+pacman -Sy && \
 # newer mesa unfortunately breaks xvfb
 curl -o mesa.tar.zst https://archive.archlinux.org/packages/m/mesa/mesa-1%3A23.3.1-1-x86_64.pkg.tar.zst && \
 # debian 13 comes with nvidia 550 so we need to use that one
@@ -50,11 +51,11 @@ rm -f *.tar.zst && \
 pacman -S --noconfirm \
 gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly \
 xfce4 xorg-server-xvfb xclip dbus pulseaudio \
-nvidia-utils lib32-nvidia-utils && \
+nvidia-utils lib32-nvidia-utils libva-nvidia-driver && \
 # clean up
 rm -rf /var/cache/pacman
 
-RUN pacman -S --noconfirm \
+RUN pacman -Sy --noconfirm \
 # programs
 mpv bash sudo yt-dlp firefox \
 # fonts
@@ -82,17 +83,27 @@ dbus-uuidgen --ensure
 
 # get yay
 RUN \
+pacman -Sy && \
 git clone https://aur.archlinux.org/yay.git /yay && \
 chown -R inu:inu /yay && \
 cd /yay && su inu -c "makepkg" && \
 pacman -U --noconfirm *.tar.zst && \
-cd .. && rm -rf /yay
+# clean up
+cd .. && rm -rf /yay && \
+rm -rf /var/cache/pacman
 
 # get from aur
 RUN \
-su inu -c "yay -S --noconfirm \
+su inu -c "yay -Sy --noconfirm \
 otf-sn-pro papirus-icon-theme ff2mpv-native-messaging-host-git" && \
-rm -rf /home/inu/.cache
+# clean up
+rm -rf /home/inu/.cache && \
+rm -rf /var/cache/pacman
+
+RUN pacman -Sy --noconfirm virtualgl opencl-nvidia && \
+# clean up
+rm -rf /var/cache/pacman
+
 
 # install user settings
 COPY user-settings.tar.gz /user-settings.tar.gz

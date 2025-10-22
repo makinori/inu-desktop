@@ -33,24 +33,17 @@ func (supervisor *Supervisor) Add(id string, start func()) {
 	})
 }
 
-// TODO: allow adding env as well
+type Command struct {
+	ID      string
+	Command string
+	Args    []string
+	Env     []string
+}
 
-// type SupervisorOption any
-
-// type SupervisorArg struct {
-// 	SupervisorOption
-// 	string
-// }
-
-// type SupervisorEnv struct {
-// 	SupervisorOption
-// 	key   string
-// 	value string
-// }
-
-func (supervisor *Supervisor) AddSimple(id string, command string, arg ...string) {
-	supervisor.Add(id, func() {
-		cmd := exec.Command(command, arg...)
+func (supervisor *Supervisor) AddCommand(command Command) {
+	supervisor.Add(command.ID, func() {
+		cmd := exec.Command(command.Command, command.Args...)
+		cmd.Env = command.Env
 
 		if config.SUPERVISOR_LOGS {
 			cmd.Stdout = os.Stdout
@@ -60,7 +53,7 @@ func (supervisor *Supervisor) AddSimple(id string, command string, arg ...string
 		err := cmd.Run()
 
 		if err != nil {
-			slog.Error(id, "err", err.Error())
+			slog.Error(command.ID, "err", err.Error())
 		}
 	})
 }
