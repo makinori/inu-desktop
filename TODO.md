@@ -4,3 +4,4 @@
 -   sticky keys for ctrl,shift,alt
 -   web page auto reconnect
 -   disable -debug packages with yay
+-   can control whilst there's no stream. ui bug
